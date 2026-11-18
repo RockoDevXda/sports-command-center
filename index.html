@@ -3,28 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#080a0d" />
+  <meta name="theme-color" content="#06080b" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="SimLab" />
+  <meta name="apple-mobile-web-app-title" content="SimLab Pro" />
   <link rel="icon" type="image/jpeg" href="./icon-512.png.jpeg" />
   <link rel="apple-touch-icon" href="./icon-512.png.jpeg" />
   <link rel="manifest" href="./manifest.json" />
-  <title>SimLab Command Center | NCAA & NBA</title>
+  <title>SimLab Pro | Quantitative Sports Terminal</title>
   <style>
     :root {
-      --bg: #080a0d;
-      --surface: #0e1217;
-      --surface-hover: #131820;
-      --input-bg: #0c1015;
-      --border: #1b222c;
-      --border-light: #26303e;
-      --text: #f1f5f9;
+      --bg: #06080b;
+      --surface: #0c1016;
+      --surface-2: #111720;
+      --surface-hover: #151d28;
+      --border: #1a2330;
+      --border-hi: #283548;
+      --text: #f8fafc;
+      --sub: #94a3b8;
       --muted: #64748b;
-      --subtext: #94a3b8;
       --emerald: #10b981;
-      --emerald-bright: #22c55e;
-      --emerald-dim: rgba(16, 185, 129, 0.14);
+      --emerald-glow: rgba(16, 185, 129, 0.16);
+      --cyan: #38bdf8;
+      --cyan-glow: rgba(56, 189, 248, 0.14);
+      --amber: #f59e0b;
+      --amber-glow: rgba(245, 158, 11, 0.14);
       --danger: #ef4444;
     }
 
@@ -32,433 +35,507 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(circle at 50% -10%, #101926 0%, var(--bg) 48%);
       color: var(--text);
       line-height: 1.4;
-      padding-bottom: 92px;
+      padding-bottom: 110px;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Top Header */
+    .wrap {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
     header {
-      background: rgba(8, 10, 13, 0.94);
-      border-bottom: 1px solid var(--border);
-      padding: 16px 24px 14px;
       position: sticky;
       top: 0;
       z-index: 40;
-      backdrop-filter: blur(12px);
+      background: rgba(6, 8, 11, 0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
     }
 
-    .container {
-      max-width: 1440px;
-      margin: 0 auto;
-    }
-
-    .top-bar {
+    .nav-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
-    .brand-group {
+    .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 11px;
     }
 
-    .brand-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      background: var(--emerald-bright);
-      color: #04130a;
+    .brand-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--emerald), #059669);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 900;
-      font-size: 1rem;
-      overflow: hidden;
+      color: #03150a;
       flex-shrink: 0;
     }
 
-    .brand-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .brand-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-    .brand-title {
-      font-size: 1.02rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: #fff;
-    }
-
-    .brand-title span {
-      color: var(--muted);
-      font-weight: 500;
-    }
-
-    .sync-line {
+    .brand-name {
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
+    }
+
+    .pro-tag {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--emerald-glow);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .telemetry-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
       font-size: 0.72rem;
       color: var(--muted);
       margin-top: 2px;
     }
 
-    .sync-dot {
-      width: 6px;
-      height: 6px;
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: var(--emerald-bright);
-      box-shadow: 0 0 8px var(--emerald-bright);
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
     }
 
-    .sync-label {
-      color: var(--emerald-bright);
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    .header-actions {
+    .nav-actions {
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
-    .btn-ghost {
-      background: var(--surface);
+    .btn-util {
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      color: var(--subtext);
-      padding: 7px 14px;
+      color: var(--sub);
+      padding: 7px 13px;
       border-radius: 8px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
       transition: all 0.15s;
     }
 
-    .btn-ghost:hover {
-      border-color: var(--border-light);
-      color: #fff;
-    }
+    .btn-util:hover { border-color: var(--border-hi); color: #fff; }
 
-    /* Sport Pill Tabs */
-    .tab-row {
+    /* Mode Switcher & Sub-Pills */
+    .mode-bar {
       display: flex;
+      justify-content: space-between;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    .sport-pill {
-      border: 1px solid transparent;
+    .segmented {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 3px;
+      border-radius: 10px;
+      gap: 4px;
+    }
+
+    .seg-btn {
+      border: none;
       background: transparent;
-      color: var(--subtext);
+      color: var(--sub);
       padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      font-weight: 600;
+      border-radius: 7px;
+      font-size: 0.8rem;
+      font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       transition: all 0.15s;
     }
 
-    .sport-pill:hover {
-      color: #fff;
-      background: var(--surface);
-    }
-
-    .sport-pill.active {
-      background: var(--emerald-bright);
+    .seg-btn.active {
+      background: var(--emerald);
       color: #03150a;
-      font-weight: 700;
     }
 
-    .pill-count {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--subtext);
-      padding: 1px 7px;
+    .seg-badge {
+      font-size: 0.7rem;
+      padding: 1px 6px;
       border-radius: 5px;
-      font-size: 0.72rem;
-      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
       font-variant-numeric: tabular-nums;
     }
 
-    .sport-pill.active .pill-count {
+    .seg-btn.active .seg-badge {
       background: rgba(0, 0, 0, 0.22);
       color: #03150a;
     }
 
-    /* KPI Summary Strip */
-    .kpi-strip {
-      max-width: 1440px;
-      margin: 20px auto 16px;
-      padding: 0 24px;
+    .stat-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
     }
 
-    .kpi-box {
+    .stat-chip {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      color: var(--sub);
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .stat-chip.active {
+      background: var(--cyan-glow);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* AI Top 4-Leg Featured Parlay Banner */
+    .hero-parlay {
+      margin-top: 18px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(12, 16, 22, 0.96) 55%, rgba(56, 189, 248, 0.07) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hero-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--emerald);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hero-legs {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
     }
 
-    .kpi-cell {
-      padding: 16px 20px;
-      border-right: 1px solid var(--border);
+    .hero-leg-card {
+      background: rgba(6, 8, 11, 0.72);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 9px 11px;
     }
 
-    .kpi-cell:last-child {
-      border-right: none;
+    .hero-leg-pick {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
     }
 
-    .kpi-label {
-      font-size: 0.68rem;
+    .hero-leg-meta {
+      font-size: 0.7rem;
+      color: var(--sub);
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+    }
+
+    .btn-load-parlay {
+      background: var(--emerald);
+      color: #03150a;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* KPI Strip */
+    .kpi-grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 13px 16px;
+    }
+
+    .kpi-lbl {
+      font-size: 0.66rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       color: var(--muted);
       text-transform: uppercase;
-      margin-bottom: 6px;
     }
 
-    .kpi-val {
-      font-size: 1.45rem;
-      font-weight: 700;
-      color: #fff;
+    .kpi-num {
+      font-size: 1.35rem;
+      font-weight: 800;
+      margin-top: 3px;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
     }
 
-    .kpi-val.muted-val {
-      font-size: 0.92rem;
-      font-weight: 500;
-      color: var(--muted);
-      padding-top: 6px;
-    }
-
-    .kpi-val.emerald-val {
-      color: var(--emerald-bright);
-    }
-
-    /* Filter & Search Bar */
-    .filter-bar {
-      max-width: 1440px;
-      margin: 0 auto 18px;
-      padding: 0 24px;
+    /* Controls */
+    .controls {
+      margin: 14px 0 16px;
       display: flex;
+      gap: 10px;
       align-items: center;
-      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .search-wrap {
+    .search-box {
       flex: 1;
-      min-width: 240px;
+      min-width: 230px;
       position: relative;
     }
 
-    .search-wrap svg {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      pointer-events: none;
-    }
-
-    .search-input {
+    .search-box input {
       width: 100%;
       background: var(--surface);
       border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px 14px 10px 38px;
+      color: #fff;
+      padding: 10px 14px 10px 36px;
       border-radius: 9px;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       outline: none;
-      transition: border-color 0.15s;
     }
 
-    .search-input:focus {
-      border-color: var(--border-light);
+    .search-box svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
     }
 
-    .filter-select {
+    .sort-select {
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 10px 34px 10px 14px;
+      padding: 10px 14px;
       border-radius: 9px;
-      font-size: 0.85rem;
-      min-width: 210px;
+      font-size: 0.84rem;
       outline: none;
       cursor: pointer;
     }
 
-    .count-indicator {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      text-transform: uppercase;
-      font-variant-numeric: tabular-nums;
-      margin-left: 4px;
-    }
-
     /* Cards Grid */
-    .cards-grid {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 0 24px;
+    .grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 14px;
     }
 
-    .prop-card {
+    .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
+      border-radius: 13px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      transition: border-color 0.15s, background 0.15s;
+      gap: 13px;
+      transition: transform 0.12s, border-color 0.15s, background 0.15s;
     }
 
-    .prop-card:hover {
-      border-color: var(--border-light);
+    .card:hover {
+      border-color: var(--border-hi);
       background: var(--surface-hover);
     }
 
-    .prop-card.in-slip {
-      border-color: var(--emerald-bright);
+    .card.active-card {
+      border-color: var(--emerald);
+      box-shadow: 0 0 0 1px var(--emerald);
     }
 
-    .card-header {
+    .card-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .entity-title {
-      font-size: 0.96rem;
+    .title-main {
+      font-size: 0.98rem;
       font-weight: 700;
       color: #fff;
-      letter-spacing: -0.01em;
     }
 
-    .entity-sub {
+    .title-sub {
       font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
       color: var(--muted);
-      text-transform: uppercase;
-      margin-top: 3px;
+      font-weight: 600;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
-    .badges-col {
+    .usg-pill {
+      background: var(--amber-glow);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.66rem;
+      font-weight: 800;
+    }
+
+    .pill-stack {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 5px;
+      gap: 4px;
       flex-shrink: 0;
     }
 
-    .stat-tag {
-      background: #161c24;
-      border: 1px solid var(--border-light);
-      color: var(--subtext);
-      font-size: 0.68rem;
+    .mkt-badge {
+      background: var(--surface-2);
+      border: 1px solid var(--border-hi);
+      color: var(--sub);
+      font-size: 0.66rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 5px;
+      letter-spacing: 0.05em;
+    }
+
+    .edge-pill {
+      font-size: 0.71rem;
       font-weight: 700;
       padding: 2px 8px;
       border-radius: 5px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .edge-tag {
-      background: #131920;
-      border: 1px solid var(--border-light);
-      color: var(--subtext);
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 9px;
-      border-radius: 6px;
+      background: var(--emerald-glow);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
       font-variant-numeric: tabular-nums;
     }
 
-    .edge-tag.hot {
-      color: var(--emerald-bright);
-      border-color: rgba(34, 197, 94, 0.35);
-      background: rgba(34, 197, 94, 0.08);
-    }
-
-    /* 3-Column Metrics Row (LINE | MODEL | HIT) */
-    .metrics-row {
+    /* Telemetry Metrics */
+    .telemetry-trio {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      align-items: end;
-      padding-top: 2px;
+      grid-template-columns: repeat(3, 1fr);
+      background: rgba(6, 8, 11, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 9px 12px;
     }
 
-    .metric-col:nth-child(2) { text-align: center; }
-    .metric-col:nth-child(3) { text-align: right; }
+    .t-col:nth-child(2) { text-align: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+    .t-col:nth-child(3) { text-align: right; }
 
-    .metric-lbl {
-      font-size: 0.65rem;
+    .t-lbl {
+      font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       color: var(--muted);
       text-transform: uppercase;
-      margin-bottom: 4px;
     }
 
-    .metric-num {
-      font-size: 1.32rem;
-      font-weight: 700;
-      color: #fff;
+    .t-val {
+      font-size: 1.18rem;
+      font-weight: 800;
+      margin-top: 2px;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
     }
 
-    .metric-num.model-val {
-      color: var(--emerald-bright);
+    /* Probability Bar */
+    .prob-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
     }
 
-    .metric-num.hit-val {
-      font-size: 1.05rem;
-      color: var(--subtext);
-      font-weight: 600;
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Dual Action Buttons (+ Over | + Under) */
-    .action-pair {
+    .meter-track {
+      height: 6px;
+      background: #1a2332;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .meter-fill-over {
+      background: linear-gradient(90deg, #059669, var(--emerald));
+      height: 100%;
+    }
+
+    .meter-fill-under {
+      background: linear-gradient(90deg, #0284c7, var(--cyan));
+      height: 100%;
+    }
+
+    /* Action Buttons */
+    .btn-pair {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
 
-    .bet-btn {
-      background: #131820;
+    .pick-btn {
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      color: var(--subtext);
-      padding: 8px 11px;
-      border-radius: 7px;
+      color: var(--sub);
+      padding: 8px 10px;
+      border-radius: 8px;
       font-size: 0.76rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
@@ -467,263 +544,232 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .bet-btn:hover {
-      border-color: var(--border-light);
-      color: #fff;
-      background: #181f29;
-    }
+    .pick-btn:hover { border-color: var(--border-hi); color: #fff; }
 
-    .bet-btn .pct {
-      color: var(--muted);
-      font-weight: 600;
-    }
-
-    .bet-btn.selected {
-      background: var(--emerald-dim);
-      border-color: var(--emerald-bright);
+    .pick-btn.sel-over {
+      background: var(--emerald-glow);
+      border-color: var(--emerald);
       color: #fff;
     }
 
-    .bet-btn.selected .pct {
-      color: var(--emerald-bright);
-      font-weight: 700;
+    .pick-btn.sel-under {
+      background: var(--cyan-glow);
+      border-color: var(--cyan);
+      color: #fff;
     }
 
-    /* Sticky Bottom Cross-Sport Slip Bar */
+    /* Kelly & Parlay Slip Dock */
     .slip-dock {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: rgba(11, 14, 19, 0.96);
-      border-top: 1px solid var(--border);
-      padding: 12px 24px;
+      background: rgba(9, 12, 17, 0.96);
+      border-top: 1px solid var(--border-hi);
+      padding: 11px 0;
       z-index: 50;
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
     }
 
-    .slip-dock-inner {
-      max-width: 1440px;
-      margin: 0 auto;
+    .slip-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
-
-    .slip-left {
-      display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
     }
 
-    .slip-badge {
-      width: 30px;
-      height: 30px;
-      border-radius: 7px;
-      background: var(--emerald-bright);
-      color: #03150a;
+    .slip-chips {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 0.85rem;
-      flex-shrink: 0;
-    }
-
-    .slip-title-block .stitle {
-      font-size: 0.68rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #fff;
-      text-transform: uppercase;
-    }
-
-    .slip-title-block .ssub {
-      font-size: 0.76rem;
-      color: var(--muted);
-    }
-
-    .chip-list {
-      display: flex;
-      gap: 6px;
+      gap: 7px;
       flex-wrap: wrap;
+      flex: 1;
     }
 
-    .slip-chip {
-      background: #141a22;
-      border: 1px solid var(--emerald-bright);
+    .chip {
+      background: var(--surface-2);
+      border: 1px solid var(--emerald);
       color: #fff;
-      padding: 4px 10px;
+      padding: 4px 9px;
       border-radius: 6px;
-      font-size: 0.74rem;
+      font-size: 0.73rem;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
     }
 
-    .slip-chip button {
+    .chip button {
       background: none;
       border: none;
       color: var(--danger);
-      font-weight: 800;
+      font-weight: 900;
       cursor: pointer;
-      font-size: 0.85rem;
     }
 
-    .slip-right {
+    .kelly-box {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
 
-    .combined-box {
+    .bankroll-input {
+      width: 78px;
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      color: #fff;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
       text-align: right;
     }
 
-    .combined-lbl {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      text-transform: uppercase;
-    }
-
-    .combined-val {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--emerald-bright);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .empty-box {
+    .empty-state {
       grid-column: 1 / -1;
       text-align: center;
-      padding: 48px 20px;
+      padding: 44px 20px;
       background: var(--surface);
       border: 1px dashed var(--border);
       border-radius: 12px;
       color: var(--muted);
-      font-size: 0.88rem;
     }
 
-    @media (max-width: 1080px) {
-      .cards-grid { grid-template-columns: repeat(2, 1fr); }
-      .kpi-box { grid-template-columns: repeat(3, 1fr); }
-      .kpi-cell { border-bottom: 1px solid var(--border); }
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .hero-legs { grid-template-columns: repeat(2, 1fr); }
     }
 
     @media (max-width: 680px) {
-      header, .kpi-strip, .filter-bar, .cards-grid, .slip-dock { padding-left: 14px; padding-right: 14px; }
-      .cards-grid { grid-template-columns: 1fr; }
-      .kpi-box { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+      .hero-legs { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="container">
-    <div class="top-bar">
-      <div class="brand-group">
-        <div class="brand-icon">
+  <div class="wrap">
+    <div class="nav-row">
+      <div class="brand">
+        <div class="brand-avatar">
           <img src="./icon-512.png.jpeg" alt="SimLab" onerror="this.remove()" />
         </div>
         <div>
-          <div class="brand-title">SimLab <span>Command Center</span></div>
-          <div class="sync-line">
-            <span class="sync-dot"></span>
-            <span class="sync-label">SYNCED</span>
+          <div class="brand-name">SimLab <span style="color:var(--sub); font-weight:500;">Terminal</span> <span class="pro-tag">10K MONTE CARLO</span></div>
+          <div class="telemetry-bar">
+            <span class="pulse-dot"></span>
+            <span style="color:var(--emerald); font-weight:700;">LIVE</span>
             <span>•</span>
-            <span id="lastSyncText">Loading live slates...</span>
+            <span id="lastSyncText">Syncing feeds...</span>
           </div>
         </div>
       </div>
 
-      <div class="header-actions">
-        <button id="installBtn" class="btn-ghost" style="display:none; border-color:var(--emerald-bright); color:var(--emerald-bright);">📲 Install App</button>
-        <button class="btn-ghost" onclick="loadAllData(true)">↻ Sync</button>
+      <div class="nav-actions">
+        <button id="installBtn" class="btn-util" style="display:none; border-color:var(--emerald); color:var(--emerald);">📲 Install App</button>
+        <button class="btn-util" onclick="loadAllData(true)">↻ Sync</button>
       </div>
     </div>
 
-    <div class="tab-row">
-      <button class="sport-pill" id="tabNcaa" onclick="switchSport('ncaa')">
-        <span>📈 NCAA D1 Slate</span>
-        <span class="pill-count" id="ncaaCount">0</span>
-      </button>
-      <button class="sport-pill active" id="tabNba" onclick="switchSport('nba')">
-        <span>🔥 NBA Player Props</span>
-        <span class="pill-count" id="nbaCount">0</span>
-      </button>
+    <div class="mode-bar">
+      <div class="segmented">
+        <button class="seg-btn active" id="tabNba" onclick="switchSport('nba')">
+          <span>🔥 NBA Player Props</span>
+          <span class="seg-badge" id="nbaCount">0</span>
+        </button>
+        <button class="seg-btn" id="tabNcaa" onclick="switchSport('ncaa')">
+          <span>🏀 NCAA D1 Slate</span>
+          <span class="seg-badge" id="ncaaCount">0</span>
+        </button>
+      </div>
+
+      <div class="stat-pills" id="statPills">
+        <button class="stat-chip active" onclick="setStatFilter('ALL', this)">ALL MARKETS</button>
+        <button class="stat-chip" onclick="setStatFilter('PTS', this)">POINTS</button>
+        <button class="stat-chip" onclick="setStatFilter('REB', this)">REBOUNDS</button>
+        <button class="stat-chip" onclick="setStatFilter('AST', this)">ASSISTS</button>
+        <button class="stat-chip" onclick="setStatFilter('PRA', this)">PRA</button>
+        <button class="stat-chip" onclick="setStatFilter('USG', this)">⚡ USAGE BUMPS</button>
+      </div>
     </div>
   </div>
 </header>
 
-<section class="kpi-strip">
-  <div class="kpi-box">
-    <div class="kpi-cell">
-      <div class="kpi-label">SLATE GAMES</div>
-      <div class="kpi-val" id="kpiGames">0</div>
+<main class="wrap">
+  <!-- Featured AI 4-Leg Parlay Strip -->
+  <section class="hero-parlay" id="heroParlay" style="display:none;">
+    <div class="hero-top">
+      <div class="hero-title">
+        <span>🎯 AI Top 4-Leg Edge Parlay</span>
+        <span id="heroOddsBadge" style="background:rgba(0,0,0,0.45); padding:2px 8px; border-radius:5px; color:#fff; font-size:0.74rem;">—</span>
+      </div>
+      <button class="btn-load-parlay" onclick="loadRecommendedParlay()">+ Load All 4 Legs to Slip</button>
     </div>
-    <div class="kpi-cell">
-      <div class="kpi-label" id="kpiSecondLabel">NBA PROPS</div>
-      <div class="kpi-val" id="kpiProps">0</div>
+    <div class="hero-legs" id="heroLegsGrid"></div>
+  </section>
+
+  <!-- KPI Telemetry Strip -->
+  <section class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-lbl" id="kpi1Lbl">NBA PROPS SIMULATED</div>
+      <div class="kpi-num" id="kpi1Val">0</div>
     </div>
-    <div class="kpi-cell">
-      <div class="kpi-label">AVG EDGE</div>
-      <div class="kpi-val" id="kpiAvgEdge">0.0 pt</div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">NCAA D1 SLATE</div>
+      <div class="kpi-num" id="kpi2Val">0</div>
     </div>
-    <div class="kpi-cell">
-      <div class="kpi-label">TOP EDGES</div>
-      <div class="kpi-val" id="kpiTopEdges">0</div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">AVG MODEL EDGE</div>
+      <div class="kpi-num" style="color:var(--emerald);" id="kpi3Val">+0.0 pt</div>
     </div>
-    <div class="kpi-cell">
-      <div class="kpi-label">SLIP HIT RATE</div>
-      <div class="kpi-val muted-val" id="kpiSlipRate">— 0 picks</div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">HIGH-CONFIDENCE (≥60%)</div>
+      <div class="kpi-num" style="color:var(--cyan);" id="kpi4Val">0</div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="filter-bar">
-  <div class="search-wrap">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-      <circle cx="11" cy="11" r="8"></circle>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-    </svg>
-    <input type="text" id="searchInput" class="search-input" placeholder="Search team, player or venue" oninput="render()" />
-  </div>
+  <!-- Search & Sort Controls -->
+  <section class="controls">
+    <div class="search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search player, team, or matchup..." oninput="render()" />
+    </div>
 
-  <select id="filterSelect" class="filter-select" onchange="render()">
-    <option value="all">All matchup / players</option>
-    <option value="top">Top model edges (≥ 58%)</option>
-    <option value="slip">On cross-sport slip</option>
-  </select>
+    <select id="sortSelect" class="sort-select" onchange="render()">
+      <option value="edge">Sort: Largest Point Edge</option>
+      <option value="prob">Sort: Highest Hit Probability %</option>
+      <option value="slip">Filter: On My Slip Only</option>
+    </select>
+  </section>
 
-  <span class="count-indicator" id="visibleCount">0 / 0 PROPS</span>
-</section>
+  <!-- Cards Grid -->
+  <section class="grid" id="cardsGrid"></section>
+</main>
 
-<main class="cards-grid" id="cardsGrid"></main>
-
+<!-- Sticky Bottom Slip & Kelly Sizing Dock -->
 <div class="slip-dock">
-  <div class="slip-dock-inner">
-    <div class="slip-left">
-      <div class="slip-badge">⚡</div>
-      <div class="slip-title-block">
-        <div class="stitle">CROSS-SPORT SLIP</div>
-        <div class="ssub" id="slipHint">Tap any pick to build an NCAA + NBA parlay</div>
-      </div>
-      <div class="chip-list" id="slipChips"></div>
+  <div class="wrap slip-row">
+    <div class="slip-chips" id="slipChips">
+      <span style="font-size:0.76rem; font-weight:800; color:var(--emerald); letter-spacing:0.05em;">⚡ CROSS-SPORT SLIP:</span>
+      <span style="font-size:0.78rem; color:var(--muted);">Tap any Over/Under or Spread button to build a parlay</span>
     </div>
 
-    <div class="slip-right">
-      <div class="combined-box">
-        <div class="combined-lbl">COMBINED HIT RATE</div>
-        <div class="combined-val" id="combinedOdds">0.0% (N/A)</div>
+    <div class="kelly-box">
+      <div style="display:flex; align-items:center; gap:5px;">
+        <span style="font-size:0.68rem; color:var(--muted); font-weight:700;">BANKROLL $</span>
+        <input type="number" id="bankrollInput" class="bankroll-input" value="500" min="10" step="50" oninput="updateSlipUI()" />
       </div>
-      <button class="btn-ghost" id="clearSlipBtn" style="display:none;" onclick="clearSlip()">Clear</button>
+      <div style="text-align:right;">
+        <div style="font-size:0.64rem; font-weight:700; color:var(--muted); letter-spacing:0.06em;">HIT RATE • ¼-KELLY BET</div>
+        <div style="font-size:0.92rem; font-weight:800; color:var(--emerald); font-variant-numeric:tabular-nums;" id="slipMetrics">0.0% • $0</div>
+      </div>
+      <button class="btn-util" id="clearSlipBtn" style="display:none;" onclick="clearSlip()">Clear</button>
     </div>
   </div>
 </div>
@@ -734,8 +780,10 @@
   const NBA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba-props-sim/main/nba_props_slate.json`;
 
   let activeSport = "nba";
+  let statFilter = "ALL";
   let ncaaGames = [];
   let nbaCards = [];
+  let recommendedParlay = [];
   let slip = [];
   let deferredPrompt = null;
 
@@ -765,9 +813,17 @@
 
   function switchSport(sport) {
     activeSport = sport;
-    document.getElementById("tabNcaa").classList.toggle("active", sport === "ncaa");
     document.getElementById("tabNba").classList.toggle("active", sport === "nba");
+    document.getElementById("tabNcaa").classList.toggle("active", sport === "ncaa");
+    document.getElementById("statPills").style.display = sport === "nba" ? "flex" : "none";
     updateKPIs();
+    render();
+  }
+
+  function setStatFilter(stat, btn) {
+    statFilter = stat;
+    document.querySelectorAll(".stat-chip").forEach(el => el.classList.remove("active"));
+    btn.classList.add("active");
     render();
   }
 
@@ -779,223 +835,292 @@
       slip.push({ key, label, prob });
     }
     updateSlipUI();
-    updateKPIs();
     render();
   }
 
   function clearSlip() {
     slip = [];
     updateSlipUI();
-    updateKPIs();
+    render();
+  }
+
+  function loadRecommendedParlay() {
+    if (!recommendedParlay.length) return;
+    slip = recommendedParlay.map(item => ({ key: item.key, label: item.label, prob: item.prob }));
+    updateSlipUI();
     render();
   }
 
   function updateSlipUI() {
     const chipsEl = document.getElementById("slipChips");
-    const hintEl = document.getElementById("slipHint");
-    const combEl = document.getElementById("combinedOdds");
+    const metricsEl = document.getElementById("slipMetrics");
     const clearBtn = document.getElementById("clearSlipBtn");
+    const bankroll = Math.max(0, parseFloat(document.getElementById("bankrollInput").value) || 0);
 
     if (slip.length === 0) {
-      chipsEl.innerHTML = "";
-      hintEl.style.display = "block";
-      combEl.textContent = "0.0% (N/A)";
+      chipsEl.innerHTML = `<span style="font-size:0.76rem; font-weight:800; color:var(--emerald); letter-spacing:0.05em;">⚡ CROSS-SPORT SLIP:</span>
+        <span style="font-size:0.78rem; color:var(--muted);">Tap any Over/Under or Spread button to build a parlay</span>`;
+      metricsEl.textContent = "0.0% • $0";
       clearBtn.style.display = "none";
       return;
     }
 
-    hintEl.style.display = "none";
     clearBtn.style.display = "inline-flex";
+    let combinedProb = 1.0;
+    slip.forEach(s => { combinedProb *= (s.prob / 100); });
+    const pct = +(combinedProb * 100).toFixed(1);
 
-    let combined = 1.0;
-    slip.forEach(s => { combined *= (s.prob / 100); });
-    const pct = +(combined * 100).toFixed(1);
-    combEl.textContent = `${pct}% (${probToAmerican(pct)})`;
+    // Assume standard -110 per leg decimal odds (1.909^n) for Quarter-Kelly sizing
+    const decOdds = Math.pow(1.9091, slip.length);
+    const b = decOdds - 1;
+    const q = 1 - combinedProb;
+    const fullKelly = Math.max(0, ((b * combinedProb) - q) / b);
+    const quarterKellyWager = Math.round(bankroll * fullKelly * 0.25);
 
+    metricsEl.textContent = `${pct}% (${probToAmerican(pct)}) • $${quarterKellyWager}`;
     chipsEl.innerHTML = slip.map(s => `
-      <div class="slip-chip">
+      <div class="chip">
         <span>${s.label} (${s.prob}%)</span>
         <button onclick="toggleSlip('${s.key}')">×</button>
       </div>
     `).join("");
   }
 
-  function updateKPIs() {
-    document.getElementById("kpiGames").textContent = ncaaGames.length;
-    const slipRateEl = document.getElementById("kpiSlipRate");
+  function buildHeroParlay() {
+    const picks = [];
+    const usedGames = new Set();
 
-    if (slip.length > 0) {
-      let c = 1.0;
-      slip.forEach(s => { c *= (s.prob / 100); });
-      const pct = +(c * 100).toFixed(1);
-      slipRateEl.className = "kpi-val emerald-val";
-      slipRateEl.textContent = `${pct}% (${slip.length} picks)`;
-    } else {
-      slipRateEl.className = "kpi-val muted-val";
-      slipRateEl.textContent = "— 0 picks";
+    // Pick top 2 NBA prop edges from distinct games
+    const topNba = [...nbaCards].sort((a, b) => b.bestProb - a.bestProb);
+    for (const c of topNba) {
+      if (picks.length >= 2) break;
+      if (!usedGames.has(c.gameId)) {
+        const isOver = c.overProb >= c.underProb;
+        picks.push({
+          key: isOver ? `${c.baseKey}-over` : `${c.baseKey}-under`,
+          label: `${c.player} ${isOver ? 'O' : 'U'} ${c.line} ${c.stat}`,
+          sub: `${c.team} vs ${c.opponent} • Model ${c.proj}`,
+          prob: c.bestProb
+        });
+        usedGames.add(c.gameId);
+      }
     }
 
+    // Pick top 2 NCAA spread/ML edges
+    const topNcaa = [...ncaaGames]
+      .filter(g => g.has_line)
+      .sort((a, b) => (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0));
+
+    for (const g of topNcaa) {
+      if (picks.length >= 4) break;
+      picks.push({
+        key: `ncaa-${g.id}-ats`,
+        label: g.spread_pick,
+        sub: `${g.away_short} @ ${g.home_short} • +${g.edge_pts} pt edge`,
+        prob: g.spread_cover_pct
+      });
+    }
+
+    recommendedParlay = picks;
+    const heroEl = document.getElementById("heroParlay");
+    if (picks.length < 2) {
+      heroEl.style.display = "none";
+      return;
+    }
+
+    heroEl.style.display = "flex";
+    let comb = 1.0;
+    picks.forEach(p => { comb *= (p.prob / 100); });
+    const combPct = +(comb * 100).toFixed(1);
+    document.getElementById("heroOddsBadge").textContent = `Hit Rate: ${combPct}% (Fair ${probToAmerican(combPct)})`;
+
+    document.getElementById("heroLegsGrid").innerHTML = picks.map((p, idx) => `
+      <div class="hero-leg-card">
+        <div class="hero-leg-pick">Leg ${idx + 1}: ${p.label}</div>
+        <div class="hero-leg-meta">
+          <span>${p.sub}</span>
+          <strong style="color:var(--emerald);">${p.prob}%</strong>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function updateKPIs() {
+    document.getElementById("kpi2Val").textContent = ncaaGames.length;
     if (activeSport === "nba") {
-      document.getElementById("kpiSecondLabel").textContent = "NBA PROPS";
-      document.getElementById("kpiProps").textContent = nbaCards.length;
-      const avg = nbaCards.length
-        ? (nbaCards.reduce((acc, c) => acc + c.edgePts, 0) / nbaCards.length).toFixed(1)
-        : "0.0";
-      document.getElementById("kpiAvgEdge").textContent = `${avg} pt`;
-      document.getElementById("kpiTopEdges").textContent = nbaCards.filter(c => c.bestProb >= 58).length;
+      document.getElementById("kpi1Lbl").textContent = "NBA PROPS SIMULATED";
+      document.getElementById("kpi1Val").textContent = nbaCards.length;
+      const avg = nbaCards.length ? (nbaCards.reduce((a, c) => a + c.edgePts, 0) / nbaCards.length).toFixed(1) : "0.0";
+      document.getElementById("kpi3Val").textContent = `+${avg} pt`;
+      document.getElementById("kpi4Val").textContent = nbaCards.filter(c => c.bestProb >= 60).length;
     } else {
-      document.getElementById("kpiSecondLabel").textContent = "NCAA LINES";
+      document.getElementById("kpi1Lbl").textContent = "NCAA LINED GAMES";
       const lined = ncaaGames.filter(g => g.has_line);
-      document.getElementById("kpiProps").textContent = lined.length;
-      const avg = lined.length
-        ? (lined.reduce((acc, g) => acc + (g.edge_pts || 0), 0) / lined.length).toFixed(1)
-        : "0.0";
-      document.getElementById("kpiAvgEdge").textContent = `${avg} pt`;
-      document.getElementById("kpiTopEdges").textContent = lined.filter(g => (g.spread_cover_pct || 0) >= 58).length;
+      document.getElementById("kpi1Val").textContent = lined.length;
+      const avg = lined.length ? (lined.reduce((a, g) => a + (g.edge_pts || 0), 0) / lined.length).toFixed(1) : "0.0";
+      document.getElementById("kpi3Val").textContent = `+${avg} pt`;
+      document.getElementById("kpi4Val").textContent = lined.filter(g => (g.spread_cover_pct || 0) >= 60).length;
     }
   }
 
   function render() {
     const grid = document.getElementById("cardsGrid");
     const q = document.getElementById("searchInput").value.toLowerCase().trim();
-    const filter = document.getElementById("filterSelect").value;
+    const sortMode = document.getElementById("sortSelect").value;
 
     if (activeSport === "nba") {
-      const filtered = nbaCards.filter(c => {
-        const matchQ = !q ||
-          c.player.toLowerCase().includes(q) ||
-          c.team.toLowerCase().includes(q) ||
-          c.opponent.toLowerCase().includes(q) ||
-          c.stat.toLowerCase().includes(q);
+      let list = nbaCards.filter(c => {
+        const matchQ = !q || c.player.toLowerCase().includes(q) || c.team.toLowerCase().includes(q) || c.opponent.toLowerCase().includes(q);
         if (!matchQ) return false;
-        if (filter === "top") return c.bestProb >= 58;
-        if (filter === "slip") return slip.some(s => s.key.startsWith(c.baseKey));
+        if (statFilter === "USG" && c.usgBump <= 0) return false;
+        if (statFilter !== "ALL" && statFilter !== "USG" && c.stat !== statFilter) return false;
+        if (sortMode === "slip") return slip.some(s => s.key.startsWith(c.baseKey));
         return true;
       });
 
-      document.getElementById("visibleCount").textContent = `${filtered.length} / ${nbaCards.length} PROPS`;
+      list.sort((a, b) => sortMode === "prob" ? b.bestProb - a.bestProb : b.edgePts - a.edgePts);
 
-      if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-box">No NBA player props match your current filter.</div>`;
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">No NBA player props match your filter.</div>`;
         return;
       }
 
-      grid.innerHTML = filtered.map(c => {
+      grid.innerHTML = list.map(c => {
         const overKey = `${c.baseKey}-over`;
         const underKey = `${c.baseKey}-under`;
         const overSel = slip.some(s => s.key === overKey);
         const underSel = slip.some(s => s.key === underKey);
-        const isHot = c.edgePts >= 1.5;
 
         return `
-          <article class="prop-card ${(overSel || underSel) ? 'in-slip' : ''}">
-            <div class="card-header">
+          <article class="card ${(overSel || underSel) ? 'active-card' : ''}">
+            <div class="card-top">
               <div>
-                <div class="entity-title">${c.player}</div>
-                <div class="entity-sub">${c.team} VS ${c.opponent}</div>
+                <div class="title-main">${c.player}</div>
+                <div class="title-sub">
+                  <span>${c.team} VS ${c.opponent}</span>
+                  ${c.usgBump > 0 ? `<span class="usg-pill">⚡ +${c.usgBump}% USG</span>` : ''}
+                </div>
               </div>
-              <div class="badges-col">
-                <span class="stat-tag">${c.stat}</span>
-                <span class="edge-tag ${isHot ? 'hot' : ''}">+${c.edgePts.toFixed(1)} pt edge</span>
-              </div>
-            </div>
-
-            <div class="metrics-row">
-              <div class="metric-col">
-                <div class="metric-lbl">LINE</div>
-                <div class="metric-num">${c.line}</div>
-              </div>
-              <div class="metric-col">
-                <div class="metric-lbl">MODEL</div>
-                <div class="metric-num model-val">${c.proj}</div>
-              </div>
-              <div class="metric-col">
-                <div class="metric-lbl">HIT</div>
-                <div class="metric-num hit-val">${c.hitRate10}/10</div>
+              <div class="pill-stack">
+                <span class="mkt-badge">${c.stat}</span>
+                <span class="edge-pill">+${c.edgePts.toFixed(1)} pt edge</span>
               </div>
             </div>
 
-            <div class="action-pair">
-              <button class="bet-btn ${overSel ? 'selected' : ''}" onclick="toggleSlip('${overKey}','${c.player} O ${c.line} ${c.stat}',${c.overProb})">
+            <div class="telemetry-trio">
+              <div class="t-col">
+                <div class="t-lbl">LINE</div>
+                <div class="t-val">${c.line}</div>
+              </div>
+              <div class="t-col">
+                <div class="t-lbl">MODEL</div>
+                <div class="t-val" style="color:var(--emerald);">${c.proj}</div>
+              </div>
+              <div class="t-col">
+                <div class="t-lbl">HIT RATE</div>
+                <div class="t-val" style="color:var(--sub);">${c.hit10}/10</div>
+              </div>
+            </div>
+
+            <div class="prob-meter">
+              <div class="meter-labels">
+                <span style="color:var(--emerald);">OVER ${c.overProb.toFixed(1)}%</span>
+                <span style="color:var(--cyan);">UNDER ${c.underProb.toFixed(1)}%</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill-over" style="width:${c.overProb}%"></div>
+                <div class="meter-fill-under" style="width:${c.underProb}%"></div>
+              </div>
+            </div>
+
+            <div class="btn-pair">
+              <button class="pick-btn ${overSel ? 'sel-over' : ''}" onclick="toggleSlip('${overKey}','${c.player} O ${c.line} ${c.stat}',${c.overProb})">
                 <span>+ Over ${c.line}</span>
-                <span class="pct">${c.overProb.toFixed(1)}%</span>
+                <span>${c.overProb.toFixed(1)}%</span>
               </button>
-              <button class="bet-btn ${underSel ? 'selected' : ''}" onclick="toggleSlip('${underKey}','${c.player} U ${c.line} ${c.stat}',${c.underProb})">
+              <button class="pick-btn ${underSel ? 'sel-under' : ''}" onclick="toggleSlip('${underKey}','${c.player} U ${c.line} ${c.stat}',${c.underProb})">
                 <span>+ Under ${c.line}</span>
-                <span class="pct">${c.underProb.toFixed(1)}%</span>
+                <span>${c.underProb.toFixed(1)}%</span>
               </button>
             </div>
           </article>
         `;
       }).join("");
     } else {
-      const sortedNcaa = [...ncaaGames].sort((a, b) => (b.edge_pts || 0) - (a.edge_pts || 0));
-      const filtered = sortedNcaa.filter(g => {
-        const matchQ = !q ||
-          g.away_team.toLowerCase().includes(q) ||
-          g.home_team.toLowerCase().includes(q) ||
-          (g.venue || "").toLowerCase().includes(q);
+      let list = ncaaGames.filter(g => {
+        const matchQ = !q || g.away_team.toLowerCase().includes(q) || g.home_team.toLowerCase().includes(q);
         if (!matchQ) return false;
-        if (filter === "top") return (g.spread_cover_pct || 0) >= 58 || (g.favored_prob || 0) >= 70;
-        if (filter === "slip") return slip.some(s => s.key.startsWith(`ncaa-${g.id}`));
+        if (sortMode === "slip") return slip.some(s => s.key.startsWith(`ncaa-${g.id}`));
         return true;
       });
 
-      document.getElementById("visibleCount").textContent = `${filtered.length} / ${ncaaGames.length} GAMES`;
+      list.sort((a, b) => sortMode === "prob"
+        ? (b.spread_cover_pct || b.favored_prob || 0) - (a.spread_cover_pct || a.favored_prob || 0)
+        : (b.edge_pts || 0) - (a.edge_pts || 0));
 
-      if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-box">No NCAA matchups match your current filter.</div>`;
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">No NCAA matchups match your filter.</div>`;
         return;
       }
 
-      grid.innerHTML = filtered.map(g => {
+      grid.innerHTML = list.map(g => {
         const atsKey = `ncaa-${g.id}-ats`;
         const mlKey = `ncaa-${g.id}-ml`;
         const atsSel = slip.some(s => s.key === atsKey);
         const mlSel = slip.some(s => s.key === mlKey);
         const simMargin = Math.abs((g.home_proj || 0) - (g.away_proj || 0)).toFixed(1);
         const simFav = (g.home_proj || 0) >= (g.away_proj || 0) ? g.home_short : g.away_short;
-        const hit10 = Math.max(1, Math.min(9, Math.round((g.spread_cover_pct || g.favored_prob || 55) / 10)));
 
         return `
-          <article class="prop-card ${(atsSel || mlSel) ? 'in-slip' : ''}">
-            <div class="card-header">
+          <article class="card ${(atsSel || mlSel) ? 'active-card' : ''}">
+            <div class="card-top">
               <div>
-                <div class="entity-title">${g.away_short} @ ${g.home_short}</div>
-                <div class="entity-sub">${g.away_proj} - ${g.home_proj} • ${g.neutral ? 'NEUTRAL' : (g.venue || 'D1')}</div>
+                <div class="title-main">${g.away_short} @ ${g.home_short}</div>
+                <div class="title-sub">SIM: ${g.away_proj} - ${g.home_proj} • ${g.neutral ? 'NEUTRAL' : (g.venue || 'D1')}</div>
               </div>
-              <div class="badges-col">
-                <span class="stat-tag">SPREAD</span>
-                <span class="edge-tag ${(g.edge_pts || 0) >= 2.5 ? 'hot' : ''}">+${(g.edge_pts || 0).toFixed(1)} pt edge</span>
-              </div>
-            </div>
-
-            <div class="metrics-row">
-              <div class="metric-col">
-                <div class="metric-lbl">LINE</div>
-                <div class="metric-num" style="font-size:1.1rem;">${g.market_line || 'PK'}</div>
-              </div>
-              <div class="metric-col">
-                <div class="metric-lbl">MODEL</div>
-                <div class="metric-num model-val" style="font-size:1.1rem;">${simFav} -${simMargin}</div>
-              </div>
-              <div class="metric-col">
-                <div class="metric-lbl">HIT</div>
-                <div class="metric-num hit-val">${hit10}/10</div>
+              <div class="pill-stack">
+                <span class="mkt-badge">SPREAD</span>
+                <span class="edge-pill">+${(g.edge_pts || 0).toFixed(1)} pt edge</span>
               </div>
             </div>
 
-            <div class="action-pair">
+            <div class="telemetry-trio">
+              <div class="t-col">
+                <div class="t-lbl">BOOK LINE</div>
+                <div class="t-val" style="font-size:1.02rem;">${g.market_line || 'PK'}</div>
+              </div>
+              <div class="t-col">
+                <div class="t-lbl">MODEL</div>
+                <div class="t-val" style="font-size:1.02rem; color:var(--emerald);">${simFav} -${simMargin}</div>
+              </div>
+              <div class="t-col">
+                <div class="t-lbl">COVER %</div>
+                <div class="t-val" style="font-size:1.02rem; color:var(--cyan);">${(g.spread_cover_pct || g.favored_prob).toFixed(1)}%</div>
+              </div>
+            </div>
+
+            <div class="prob-meter">
+              <div class="meter-labels">
+                <span style="color:var(--emerald);">${g.away_short} ${g.away_win_pct}%</span>
+                <span style="color:var(--cyan);">${g.home_short} ${g.home_win_pct}%</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill-over" style="width:${g.away_win_pct}%"></div>
+                <div class="meter-fill-under" style="width:${g.home_win_pct}%"></div>
+              </div>
+            </div>
+
+            <div class="btn-pair">
               ${g.has_line
-                ? `<button class="bet-btn ${atsSel ? 'selected' : ''}" onclick="toggleSlip('${atsKey}','${g.spread_pick}',${g.spread_cover_pct})">
+                ? `<button class="pick-btn ${atsSel ? 'sel-over' : ''}" onclick="toggleSlip('${atsKey}','${g.spread_pick}',${g.spread_cover_pct})">
                     <span>+ ${g.spread_pick}</span>
-                    <span class="pct">${g.spread_cover_pct.toFixed(1)}%</span>
+                    <span>${g.spread_cover_pct.toFixed(1)}%</span>
                    </button>`
-                : `<button class="bet-btn" disabled><span>Line Pending</span><span class="pct">—</span></button>`
+                : `<button class="pick-btn" disabled><span>Line Pending</span><span>—</span></button>`
               }
-              <button class="bet-btn ${mlSel ? 'selected' : ''}" onclick="toggleSlip('${mlKey}','${g.favored_team} ML',${g.favored_prob})">
+              <button class="pick-btn ${mlSel ? 'sel-under' : ''}" onclick="toggleSlip('${mlKey}','${g.favored_team} ML',${g.favored_prob})">
                 <span>+ ${g.favored_team} ML</span>
-                <span class="pct">${g.favored_prob.toFixed(1)}%</span>
+                <span>${g.favored_prob.toFixed(1)}%</span>
               </button>
             </div>
           </article>
@@ -1011,29 +1136,30 @@
         const overProb = Number(m.prob || 50);
         const underProb = +(100 - overProb).toFixed(1);
         const edgePts = Math.abs((Number(m.proj) || 0) - (Number(m.line) || 0));
-        const bestProb = Math.max(overProb, underProb);
         cards.push({
           baseKey: `nba-${p.id}-${m.stat}`,
+          gameId: p.game_id || `${p.team}-${p.opponent}`,
           player: p.player,
           team: p.team,
           opponent: p.opponent,
+          usgBump: p.usage_bump_pct || 0,
           stat: m.stat,
           line: m.line,
           proj: m.proj,
           overProb,
           underProb,
-          bestProb,
+          bestProb: Math.max(overProb, underProb),
           edgePts,
-          hitRate10: Math.max(1, Math.min(9, Math.round(overProb / 10))),
+          hit10: Math.max(1, Math.min(9, Math.round(overProb / 10))),
         });
       });
     });
-    return cards.sort((a, b) => b.edgePts - a.edgePts);
+    return cards;
   }
 
   async function loadAllData(force = false) {
     const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
-    document.getElementById("lastSyncText").textContent = "Syncing live data...";
+    document.getElementById("lastSyncText").textContent = "Syncing feeds...";
 
     try {
       const [ncaaRes, nbaRes] = await Promise.allSettled([
@@ -1052,9 +1178,10 @@
       document.getElementById("ncaaCount").textContent = ncaaGames.length;
       document.getElementById("nbaCount").textContent = nbaCards.length;
 
-      const ts = ncaaGames[0]?.generated_at || "Last sim today";
+      const ts = ncaaGames[0]?.generated_at || "Live";
       document.getElementById("lastSyncText").textContent = `Last sim ${ts}`;
 
+      buildHeroParlay();
       updateKPIs();
       render();
     } catch (err) {
