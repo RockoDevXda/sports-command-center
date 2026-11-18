@@ -759,4 +759,310 @@
 
   function probToAmerican(pct) {
     const p = pct / 100;
-    if (p <=
+    if (p <= 0 || p >= 1) return "N/A";
+    return p >= 0.5 ? `${Math.round(-100 * p / (1 - p))}` : `+${Math.round(100 * (1 - p) / p)}`;
+  }
+
+  function switchSport(sport) {
+    activeSport = sport;
+    document.getElementById("tabNcaa").classList.toggle("active", sport === "ncaa");
+    document.getElementById("tabNba").classList.toggle("active", sport === "nba");
+    updateKPIs();
+    render();
+  }
+
+  function toggleSlip(key, label, prob) {
+    const idx = slip.findIndex(s => s.key === key);
+    if (idx !== -1) {
+      slip.splice(idx, 1);
+    } else {
+      slip.push({ key, label, prob });
+    }
+    updateSlipUI();
+    updateKPIs();
+    render();
+  }
+
+  function clearSlip() {
+    slip = [];
+    updateSlipUI();
+    updateKPIs();
+    render();
+  }
+
+  function updateSlipUI() {
+    const chipsEl = document.getElementById("slipChips");
+    const hintEl = document.getElementById("slipHint");
+    const combEl = document.getElementById("combinedOdds");
+    const clearBtn = document.getElementById("clearSlipBtn");
+
+    if (slip.length === 0) {
+      chipsEl.innerHTML = "";
+      hintEl.style.display = "block";
+      combEl.textContent = "0.0% (N/A)";
+      clearBtn.style.display = "none";
+      return;
+    }
+
+    hintEl.style.display = "none";
+    clearBtn.style.display = "inline-flex";
+
+    let combined = 1.0;
+    slip.forEach(s => { combined *= (s.prob / 100); });
+    const pct = +(combined * 100).toFixed(1);
+    combEl.textContent = `${pct}% (${probToAmerican(pct)})`;
+
+    chipsEl.innerHTML = slip.map(s => `
+      <div class="slip-chip">
+        <span>${s.label} (${s.prob}%)</span>
+        <button onclick="toggleSlip('${s.key}')">×</button>
+      </div>
+    `).join("");
+  }
+
+  function updateKPIs() {
+    document.getElementById("kpiGames").textContent = ncaaGames.length;
+    const slipRateEl = document.getElementById("kpiSlipRate");
+
+    if (slip.length > 0) {
+      let c = 1.0;
+      slip.forEach(s => { c *= (s.prob / 100); });
+      const pct = +(c * 100).toFixed(1);
+      slipRateEl.className = "kpi-val emerald-val";
+      slipRateEl.textContent = `${pct}% (${slip.length} picks)`;
+    } else {
+      slipRateEl.className = "kpi-val muted-val";
+      slipRateEl.textContent = "— 0 picks";
+    }
+
+    if (activeSport === "nba") {
+      document.getElementById("kpiSecondLabel").textContent = "NBA PROPS";
+      document.getElementById("kpiProps").textContent = nbaCards.length;
+      const avg = nbaCards.length
+        ? (nbaCards.reduce((acc, c) => acc + c.edgePts, 0) / nbaCards.length).toFixed(1)
+        : "0.0";
+      document.getElementById("kpiAvgEdge").textContent = `${avg} pt`;
+      document.getElementById("kpiTopEdges").textContent = nbaCards.filter(c => c.bestProb >= 58).length;
+    } else {
+      document.getElementById("kpiSecondLabel").textContent = "NCAA LINES";
+      const lined = ncaaGames.filter(g => g.has_line);
+      document.getElementById("kpiProps").textContent = lined.length;
+      const avg = lined.length
+        ? (lined.reduce((acc, g) => acc + (g.edge_pts || 0), 0) / lined.length).toFixed(1)
+        : "0.0";
+      document.getElementById("kpiAvgEdge").textContent = `${avg} pt`;
+      document.getElementById("kpiTopEdges").textContent = lined.filter(g => (g.spread_cover_pct || 0) >= 58).length;
+    }
+  }
+
+  function render() {
+    const grid = document.getElementById("cardsGrid");
+    const q = document.getElementById("searchInput").value.toLowerCase().trim();
+    const filter = document.getElementById("filterSelect").value;
+
+    if (activeSport === "nba") {
+      const filtered = nbaCards.filter(c => {
+        const matchQ = !q ||
+          c.player.toLowerCase().includes(q) ||
+          c.team.toLowerCase().includes(q) ||
+          c.opponent.toLowerCase().includes(q) ||
+          c.stat.toLowerCase().includes(q);
+        if (!matchQ) return false;
+        if (filter === "top") return c.bestProb >= 58;
+        if (filter === "slip") return slip.some(s => s.key.startsWith(c.baseKey));
+        return true;
+      });
+
+      document.getElementById("visibleCount").textContent = `${filtered.length} / ${nbaCards.length} PROPS`;
+
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="empty-box">No NBA player props match your current filter.</div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(c => {
+        const overKey = `${c.baseKey}-over`;
+        const underKey = `${c.baseKey}-under`;
+        const overSel = slip.some(s => s.key === overKey);
+        const underSel = slip.some(s => s.key === underKey);
+        const isHot = c.edgePts >= 1.5;
+
+        return `
+          <article class="prop-card ${(overSel || underSel) ? 'in-slip' : ''}">
+            <div class="card-header">
+              <div>
+                <div class="entity-title">${c.player}</div>
+                <div class="entity-sub">${c.team} VS ${c.opponent}</div>
+              </div>
+              <div class="badges-col">
+                <span class="stat-tag">${c.stat}</span>
+                <span class="edge-tag ${isHot ? 'hot' : ''}">+${c.edgePts.toFixed(1)} pt edge</span>
+              </div>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric-col">
+                <div class="metric-lbl">LINE</div>
+                <div class="metric-num">${c.line}</div>
+              </div>
+              <div class="metric-col">
+                <div class="metric-lbl">MODEL</div>
+                <div class="metric-num model-val">${c.proj}</div>
+              </div>
+              <div class="metric-col">
+                <div class="metric-lbl">HIT</div>
+                <div class="metric-num hit-val">${c.hitRate10}/10</div>
+              </div>
+            </div>
+
+            <div class="action-pair">
+              <button class="bet-btn ${overSel ? 'selected' : ''}" onclick="toggleSlip('${overKey}','${c.player} O ${c.line} ${c.stat}',${c.overProb})">
+                <span>+ Over ${c.line}</span>
+                <span class="pct">${c.overProb.toFixed(1)}%</span>
+              </button>
+              <button class="bet-btn ${underSel ? 'selected' : ''}" onclick="toggleSlip('${underKey}','${c.player} U ${c.line} ${c.stat}',${c.underProb})">
+                <span>+ Under ${c.line}</span>
+                <span class="pct">${c.underProb.toFixed(1)}%</span>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    } else {
+      const sortedNcaa = [...ncaaGames].sort((a, b) => (b.edge_pts || 0) - (a.edge_pts || 0));
+      const filtered = sortedNcaa.filter(g => {
+        const matchQ = !q ||
+          g.away_team.toLowerCase().includes(q) ||
+          g.home_team.toLowerCase().includes(q) ||
+          (g.venue || "").toLowerCase().includes(q);
+        if (!matchQ) return false;
+        if (filter === "top") return (g.spread_cover_pct || 0) >= 58 || (g.favored_prob || 0) >= 70;
+        if (filter === "slip") return slip.some(s => s.key.startsWith(`ncaa-${g.id}`));
+        return true;
+      });
+
+      document.getElementById("visibleCount").textContent = `${filtered.length} / ${ncaaGames.length} GAMES`;
+
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="empty-box">No NCAA matchups match your current filter.</div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(g => {
+        const atsKey = `ncaa-${g.id}-ats`;
+        const mlKey = `ncaa-${g.id}-ml`;
+        const atsSel = slip.some(s => s.key === atsKey);
+        const mlSel = slip.some(s => s.key === mlKey);
+        const simMargin = Math.abs((g.home_proj || 0) - (g.away_proj || 0)).toFixed(1);
+        const simFav = (g.home_proj || 0) >= (g.away_proj || 0) ? g.home_short : g.away_short;
+        const hit10 = Math.max(1, Math.min(9, Math.round((g.spread_cover_pct || g.favored_prob || 55) / 10)));
+
+        return `
+          <article class="prop-card ${(atsSel || mlSel) ? 'in-slip' : ''}">
+            <div class="card-header">
+              <div>
+                <div class="entity-title">${g.away_short} @ ${g.home_short}</div>
+                <div class="entity-sub">${g.away_proj} - ${g.home_proj} • ${g.neutral ? 'NEUTRAL' : (g.venue || 'D1')}</div>
+              </div>
+              <div class="badges-col">
+                <span class="stat-tag">SPREAD</span>
+                <span class="edge-tag ${(g.edge_pts || 0) >= 2.5 ? 'hot' : ''}">+${(g.edge_pts || 0).toFixed(1)} pt edge</span>
+              </div>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric-col">
+                <div class="metric-lbl">LINE</div>
+                <div class="metric-num" style="font-size:1.1rem;">${g.market_line || 'PK'}</div>
+              </div>
+              <div class="metric-col">
+                <div class="metric-lbl">MODEL</div>
+                <div class="metric-num model-val" style="font-size:1.1rem;">${simFav} -${simMargin}</div>
+              </div>
+              <div class="metric-col">
+                <div class="metric-lbl">HIT</div>
+                <div class="metric-num hit-val">${hit10}/10</div>
+              </div>
+            </div>
+
+            <div class="action-pair">
+              ${g.has_line
+                ? `<button class="bet-btn ${atsSel ? 'selected' : ''}" onclick="toggleSlip('${atsKey}','${g.spread_pick}',${g.spread_cover_pct})">
+                    <span>+ ${g.spread_pick}</span>
+                    <span class="pct">${g.spread_cover_pct.toFixed(1)}%</span>
+                   </button>`
+                : `<button class="bet-btn" disabled><span>Line Pending</span><span class="pct">—</span></button>`
+              }
+              <button class="bet-btn ${mlSel ? 'selected' : ''}" onclick="toggleSlip('${mlKey}','${g.favored_team} ML',${g.favored_prob})">
+                <span>+ ${g.favored_team} ML</span>
+                <span class="pct">${g.favored_prob.toFixed(1)}%</span>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+  }
+
+  function buildNbaPropCards(players) {
+    const cards = [];
+    players.forEach(p => {
+      (p.all_props || []).forEach(m => {
+        const overProb = Number(m.prob || 50);
+        const underProb = +(100 - overProb).toFixed(1);
+        const edgePts = Math.abs((Number(m.proj) || 0) - (Number(m.line) || 0));
+        const bestProb = Math.max(overProb, underProb);
+        cards.push({
+          baseKey: `nba-${p.id}-${m.stat}`,
+          player: p.player,
+          team: p.team,
+          opponent: p.opponent,
+          stat: m.stat,
+          line: m.line,
+          proj: m.proj,
+          overProb,
+          underProb,
+          bestProb,
+          edgePts,
+          hitRate10: Math.max(1, Math.min(9, Math.round(overProb / 10))),
+        });
+      });
+    });
+    return cards.sort((a, b) => b.edgePts - a.edgePts);
+  }
+
+  async function loadAllData(force = false) {
+    const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
+    document.getElementById("lastSyncText").textContent = "Syncing live data...";
+
+    try {
+      const [ncaaRes, nbaRes] = await Promise.allSettled([
+        fetch(NCAA_JSON_URL + bust),
+        fetch(NBA_JSON_URL + bust)
+      ]);
+
+      if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) {
+        ncaaGames = await ncaaRes.value.json();
+      }
+      if (nbaRes.status === "fulfilled" && nbaRes.value.ok) {
+        const rawPlayers = await nbaRes.value.json();
+        nbaCards = buildNbaPropCards(rawPlayers);
+      }
+
+      document.getElementById("ncaaCount").textContent = ncaaGames.length;
+      document.getElementById("nbaCount").textContent = nbaCards.length;
+
+      const ts = ncaaGames[0]?.generated_at || "Last sim today";
+      document.getElementById("lastSyncText").textContent = `Last sim ${ts}`;
+
+      updateKPIs();
+      render();
+    } catch (err) {
+      document.getElementById("lastSyncText").textContent = "Offline mode";
+    }
+  }
+
+  loadAllData();
+</script>
+</body>
+</html>
