@@ -1,5 +1,10 @@
-const CACHE_NAME = 'simlab-command-v1';
-const SHELL_ASSETS = ['./', './index.html', './manifest.json'];
+const CACHE_NAME = 'simlab-command-v4';
+const SHELL_ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-512.png.jpeg'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -11,30 +16,30 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  // Network-first for live JSON slates so nightly updates always appear immediately
-  if (url.pathname.endsWith('.json') && !url.pathname.endsWith('manifest.json')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
+  if (event.request.method !== 'GET') return;
 
-  // Cache-first for app shell
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
