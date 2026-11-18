@@ -77,7 +77,7 @@
     .brand-title {
       font-size: 0.98rem;
       font-weight: 800;
-      letter-spacing: -0.01em;
+      letter-spacing -0.01em;
     }
 
     .sync-sub {
@@ -298,7 +298,6 @@
       white-space: nowrap;
     }
 
-    /* Visual 10-Game Streak Strip */
     .streak-bar {
       display: flex;
       justify-content: space-between;
@@ -335,24 +334,31 @@
       gap: 6px;
     }
 
+    .ncaa-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 5px;
+    }
+
     .p-btn {
       background: #131922;
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 7px 9px;
+      padding: 7px 8px;
       border-radius: 7px;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
+      gap: 4px;
     }
 
     .p-btn .sim-hint {
       display: block;
-      font-size: 0.63rem;
+      font-size: 0.62rem;
       color: var(--muted);
       font-weight: 500;
     }
@@ -365,7 +371,7 @@
 
     .p-btn .hit-mini {
       display: block;
-      font-size: 0.61rem;
+      font-size: 0.6rem;
       color: var(--muted);
       font-weight: 600;
     }
@@ -382,11 +388,13 @@
     .ncaa-scores {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       background: #0a0e14;
       padding: 6px 9px;
       border-radius: 7px;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       font-variant-numeric: tabular-nums;
+      gap: 6px;
     }
 
     .load-more-btn {
@@ -402,7 +410,6 @@
       cursor: pointer;
     }
 
-    /* Floating Slip Drawer */
     .slip-bar {
       position: fixed;
       bottom: 10px;
@@ -500,6 +507,13 @@
     <button class="f-chip" onclick="setSubFilter('PRA', this)">PRA</button>
   </div>
 
+  <div class="chip-strip" id="ncaaChips" style="display:none;">
+    <button class="f-chip active" onclick="setNcaaFilter('ALL', this)">ALL GAMES</button>
+    <button class="f-chip" onclick="setNcaaFilter('MOVES', this)">📉 LINE MOVES</button>
+    <button class="f-chip" onclick="setNcaaFilter('TOTALS', this)">🎯 BEST TOTALS</button>
+    <button class="f-chip" onclick="setNcaaFilter('SPREADS', this)">📊 BEST SPREADS</button>
+  </div>
+
   <div class="parlay-banner" id="heroParlay" style="display:none;">
     <div>
       <div class="parlay-banner-text">🎯 AI Top 4-Leg Edge Parlay</div>
@@ -532,6 +546,7 @@
 
   let activeSport = "nba";
   let subFilter = "ALL";
+  let ncaaFilter = "ALL";
   let visibleLimit = 25;
   let ncaaGames = [];
   let nbaPlayers = [];
@@ -569,13 +584,22 @@
     document.getElementById("tabNba").className = sport === "nba" ? "tab active-nba" : "tab";
     document.getElementById("tabNcaa").className = sport === "ncaa" ? "tab active-ncaa" : "tab";
     document.getElementById("nbaChips").style.display = sport === "nba" ? "flex" : "none";
+    document.getElementById("ncaaChips").style.display = sport === "ncaa" ? "flex" : "none";
     render();
   }
 
   function setSubFilter(val, btn) {
     subFilter = val;
     visibleLimit = 25;
-    document.querySelectorAll(".f-chip").forEach(c => c.classList.remove("active"));
+    document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    render();
+  }
+
+  function setNcaaFilter(val, btn) {
+    ncaaFilter = val;
+    visibleLimit = 25;
+    document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
     render();
   }
@@ -667,15 +691,27 @@
     }
 
     const sortedNcaa = [...ncaaGames]
-      .filter(g => g.has_line)
+      .filter(g => g.has_line && g.verified_d1 !== false && Math.abs(g.home_spread || 0) <= 24.5)
       .sort((a, b) => (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0));
 
     for (const g of sortedNcaa) {
-      if (legs.length >= 4) break;
+      if (legs.length >= 3) break;
       legs.push({
         key: `ncaa-${g.id}-ats`,
         label: g.spread_pick,
         prob: g.spread_cover_pct
+      });
+    }
+
+    const topTotalGame = [...ncaaGames]
+      .filter(g => g.has_total && g.verified_d1 !== false && (g.total_edge_pts || 0) <= 14.0)
+      .sort((a, b) => (b.total_cover_pct || 0) - (a.total_cover_pct || 0))[0];
+
+    if (topTotalGame && legs.length < 4) {
+      legs.push({
+        key: `ncaa-${topTotalGame.id}-tot`,
+        label: `${topTotalGame.away_short}/${topTotalGame.home_short} ${topTotalGame.total_pick}`,
+        prob: topTotalGame.total_cover_pct
       });
     }
 
@@ -780,11 +816,20 @@
         `;
       }).join("");
     } else {
-      const sorted = [...ncaaGames].sort((a, b) => (b.spread_cover_pct || b.favored_prob || 0) - (a.spread_cover_pct || a.favored_prob || 0));
+      const sorted = [...ncaaGames].sort((a, b) => {
+        if (ncaaFilter === "TOTALS") return (b.total_cover_pct || 0) - (a.total_cover_pct || 0);
+        if (ncaaFilter === "SPREADS") return (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0);
+        if (ncaaFilter === "MOVES") return (Math.abs(b.spread_move || 0) + Math.abs(b.total_move || 0)) - (Math.abs(a.spread_move || 0) + Math.abs(a.total_move || 0));
+        return Math.max(b.spread_cover_pct || 0, b.total_cover_pct || 0) - Math.max(a.spread_cover_pct || 0, a.total_cover_pct || 0);
+      });
+
       const filtered = sorted.filter(g => {
         const matchQ = !q || g.away_team.toLowerCase().includes(q) || g.home_team.toLowerCase().includes(q);
         if (!matchQ) return false;
-        if (filter === "edge" && (g.spread_cover_pct || 0) < 57 && (g.favored_prob || 0) < 70) return false;
+        if (ncaaFilter === "MOVES" && !g.has_move) return false;
+        if (ncaaFilter === "TOTALS" && !g.has_total) return false;
+        if (ncaaFilter === "SPREADS" && !g.has_line) return false;
+        if (filter === "edge" && (g.spread_cover_pct || 0) < 57 && (g.total_cover_pct || 0) < 57) return false;
         if (filter === "slip" && !slip.some(s => s.key.startsWith(`ncaa-${g.id}`))) return false;
         return true;
       });
@@ -795,30 +840,44 @@
 
       listEl.innerHTML = slice.map(g => {
         const atsKey = `ncaa-${g.id}-ats`;
+        const totKey = `ncaa-${g.id}-tot`;
         const mlKey = `ncaa-${g.id}-ml`;
         const atsSel = slip.some(s => s.key === atsKey);
+        const totSel = slip.some(s => s.key === totKey);
         const mlSel = slip.some(s => s.key === mlKey);
+        const simTotal = g.total_proj || +(g.away_proj + g.home_proj).toFixed(1);
+
+        const moveTags = (g.move_badges || []).map(b =>
+          `<span class="s-tag cyan">${b}</span>`
+        ).join("");
 
         return `
-          <article class="card ${(atsSel || mlSel) ? 'in-slip' : ''}">
+          <article class="card ${(atsSel || totSel || mlSel) ? 'in-slip' : ''}">
             <div class="c-head">
               <div>
                 <div class="c-name">${g.away_short} @ ${g.home_short}</div>
-                <div class="c-meta">${g.tipoff || ''} • Line: ${g.market_line || 'PK'}</div>
+                <div class="c-meta">${g.tipoff || ''} • ${g.market_line || 'PK'}${g.has_total ? ` • O/U ${g.over_under}` : ''}</div>
+                ${moveTags ? `<div class="sharp-tags">${moveTags}</div>` : ''}
               </div>
-              ${g.has_line ? `<span class="edge-tag">+${g.edge_pts} pt edge</span>` : ''}
+              ${g.has_line ? `<span class="edge-tag">+${g.edge_pts} ATS</span>` : ''}
             </div>
             <div class="ncaa-scores">
-              <span><strong>${g.away_short}</strong> ${g.away_proj} (${g.away_win_pct}%)</span>
-              <span><strong>${g.home_short}</strong> ${g.home_proj} (${g.home_win_pct}%)</span>
+              <span><strong>${g.away_short}</strong> ${g.away_proj} • <strong>${g.home_short}</strong> ${g.home_proj}</span>
+              <span style="color:var(--cyan); font-weight:700;">Tot: ${simTotal}</span>
             </div>
-            <div class="prop-grid">
+            <div class="ncaa-grid">
               ${g.has_line
                 ? `<button class="p-btn ${atsSel ? 'selected' : ''} ${g.spread_cover_pct >= 58 ? 'hot' : ''}" onclick="toggleSlip('${atsKey}','${g.spread_pick}',${g.spread_cover_pct})">
                     <span>${g.spread_pick}</span>
                     <span class="prob-val">${g.spread_cover_pct}%</span>
                    </button>`
-                : `<button class="p-btn" disabled><span>No Spread</span></button>`}
+                : `<button class="p-btn" disabled><span>No Line</span></button>`}
+              ${g.has_total
+                ? `<button class="p-btn ${totSel ? 'selected' : ''} ${g.total_cover_pct >= 58 ? 'hot' : ''}" onclick="toggleSlip('${totKey}','${g.away_short}/${g.home_short} ${g.total_pick}',${g.total_cover_pct})">
+                    <span>${g.total_pick}</span>
+                    <span class="prob-val">${g.total_cover_pct}%</span>
+                   </button>`
+                : `<button class="p-btn" disabled><span>No O/U</span></button>`}
               <button class="p-btn ${mlSel ? 'selected' : ''} ${g.favored_prob >= 70 ? 'hot' : ''}" onclick="toggleSlip('${mlKey}','${g.favored_team} ML',${g.favored_prob})">
                 <span>${g.favored_team} ML</span>
                 <span class="prob-val">${g.favored_prob}%</span>
