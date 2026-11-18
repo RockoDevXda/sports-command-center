@@ -10,7 +10,7 @@
   <link rel="icon" type="image/jpeg" href="./icon-512.png.jpeg" />
   <link rel="apple-touch-icon" href="./icon-512.png.jpeg" />
   <link rel="manifest" href="./manifest.json" />
-  <title>SimLab | Mobile Sports Terminal</title>
+  <title>SimLab | Pro Sports Terminal</title>
   <style>
     :root {
       --bg: #07090d;
@@ -25,6 +25,7 @@
       --orange: #f97316;
       --orange-dim: rgba(249, 115, 22, 0.16);
       --cyan: #38bdf8;
+      --cyan-dim: rgba(56, 189, 248, 0.14);
       --danger: #ef4444;
     }
 
@@ -39,15 +40,14 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    body.has-slip { padding-bottom: 115px; }
+    body.has-slip { padding-bottom: 130px; }
 
     .wrap {
-      max-width: 1100px;
+      max-width: 1120px;
       margin: 0 auto;
       padding: 0 12px;
     }
 
-    /* Non-sticky Header so 100% of screen scrolls freely */
     header {
       padding: 12px 0 10px;
       border-bottom: 1px solid var(--border);
@@ -106,7 +106,6 @@
       cursor: pointer;
     }
 
-    /* Compact Segmented Switcher */
     .tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -135,7 +134,6 @@
     .tab.active-nba { background: var(--orange); color: #fff; }
     .tab.active-ncaa { background: var(--emerald); color: #03150a; }
 
-    /* Compact Single-Row Search & Filter */
     .toolbar {
       display: flex;
       gap: 6px;
@@ -162,10 +160,9 @@
       border-radius: 8px;
       font-size: 0.78rem;
       font-weight: 600;
-      max-width: 138px;
+      max-width: 142px;
     }
 
-    /* Horizontal Scrollable Stat Chips */
     .chip-strip {
       display: flex;
       gap: 6px;
@@ -193,7 +190,6 @@
       color: var(--emerald);
     }
 
-    /* Collapsible AI 4-Leg Parlay Pill */
     .parlay-banner {
       background: linear-gradient(90deg, rgba(16, 185, 129, 0.12), rgba(14, 19, 26, 0.95));
       border: 1px solid rgba(16, 185, 129, 0.3);
@@ -230,17 +226,16 @@
       cursor: pointer;
     }
 
-    /* Ultra-Compact Cards */
     .list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(335px, 1fr));
+      gap: 9px;
     }
 
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 11px;
       padding: 11px 12px;
       display: flex;
       flex-direction: column;
@@ -252,7 +247,7 @@
     .c-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 6px;
     }
 
@@ -268,15 +263,28 @@
       font-weight: 600;
     }
 
-    .usg-tag {
+    .sharp-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 3px;
+    }
+
+    .s-tag {
       background: var(--orange-dim);
       color: var(--orange);
-      border: 1px solid rgba(249, 115, 22, 0.35);
-      padding: 2px 6px;
-      border-radius: 5px;
-      font-size: 0.66rem;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.63rem;
       font-weight: 800;
       white-space: nowrap;
+    }
+
+    .s-tag.cyan {
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      border-color: rgba(56, 189, 248, 0.3);
     }
 
     .edge-tag {
@@ -290,7 +298,37 @@
       white-space: nowrap;
     }
 
-    /* 2x2 Tight Prop Grid per Player */
+    /* Visual 10-Game Streak Strip */
+    .streak-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #090c11;
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      border-radius: 7px;
+      font-size: 0.68rem;
+      color: var(--sub);
+    }
+
+    .dots-wrap {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .g-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #232d3d;
+    }
+
+    .g-dot.hit {
+      background: var(--emerald);
+      box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+    }
+
     .prop-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -322,6 +360,14 @@
     .p-btn .prob-val {
       font-weight: 800;
       color: var(--sub);
+      text-align: right;
+    }
+
+    .p-btn .hit-mini {
+      display: block;
+      font-size: 0.61rem;
+      color: var(--muted);
+      font-weight: 600;
     }
 
     .p-btn.hot .prob-val { color: var(--emerald); }
@@ -333,7 +379,6 @@
 
     .p-btn.selected .prob-val { color: var(--emerald); }
 
-    /* Compact NCAA Matchup Row */
     .ncaa-scores {
       display: flex;
       justify-content: space-between;
@@ -357,13 +402,13 @@
       cursor: pointer;
     }
 
-    /* Auto-Hiding Floating Slip Drawer */
+    /* Floating Slip Drawer */
     .slip-bar {
       position: fixed;
       bottom: 10px;
       left: 10px;
       right: 10px;
-      max-width: 1076px;
+      max-width: 1096px;
       margin: 0 auto;
       background: rgba(13, 18, 26, 0.97);
       border: 1px solid var(--emerald);
@@ -383,6 +428,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
     }
 
     .slip-chips {
@@ -446,6 +492,7 @@
 
   <div class="chip-strip" id="nbaChips">
     <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PLAYERS</button>
+    <button class="f-chip" onclick="setSubFilter('HOT', this)">🔥 8/10 STREAKS</button>
     <button class="f-chip" onclick="setSubFilter('USG', this)">⚡ USAGE BUMPS</button>
     <button class="f-chip" onclick="setSubFilter('PTS', this)">POINTS</button>
     <button class="f-chip" onclick="setSubFilter('REB', this)">REBOUNDS</button>
@@ -465,13 +512,15 @@
   <button class="load-more-btn" id="loadMoreBtn" style="display:none;" onclick="showMore()">Show More Results</button>
 </div>
 
-<!-- Auto-Hiding Floating Slip Drawer -->
 <div class="slip-bar" id="slipBar">
   <div class="slip-top">
-    <div style="font-size:0.76rem; font-weight:800; color:var(--emerald);">
-      🎯 PARLAY SLIP (<span id="slipCount">0</span>) • <span id="slipOdds" style="color:#fff;">0.0%</span>
+    <div style="font-size:0.75rem; font-weight:800; color:var(--emerald);">
+      🎯 SLIP (<span id="slipCount">0</span>) • <span id="slipOdds" style="color:#fff;">0.0%</span> • <span id="slipPayout" style="color:var(--cyan);">$25 → $0</span>
     </div>
-    <button class="btn-sm" style="padding:3px 8px; font-size:0.7rem;" onclick="clearSlip()">Clear</button>
+    <div style="display:flex; gap:5px;">
+      <button id="copySlipBtn" class="btn-sm" style="padding:3px 8px; font-size:0.7rem; border-color:var(--emerald); color:var(--emerald);" onclick="copySlipText()">📋 Copy</button>
+      <button class="btn-sm" style="padding:3px 8px; font-size:0.7rem;" onclick="clearSlip()">Clear</button>
+    </div>
   </div>
   <div class="slip-chips" id="slipChips"></div>
 </div>
@@ -565,6 +614,22 @@
     render();
   }
 
+  function copySlipText() {
+    if (!slip.length) return;
+    let comb = 1.0;
+    slip.forEach(s => { comb *= (s.prob / 100); });
+    const pct = +(comb * 100).toFixed(1);
+    const lines = [
+      `🎯 SimLab ${slip.length}-Leg Parlay (${pct}% | Fair ${probToAmerican(pct)}):`,
+      ...slip.map((s, i) => `${i + 1}. ${s.label} (${s.prob}%)`)
+    ].join("\n");
+    navigator.clipboard.writeText(lines).then(() => {
+      const btn = document.getElementById("copySlipBtn");
+      btn.textContent = "✓ Copied";
+      setTimeout(() => { btn.textContent = "📋 Copy"; }, 1800);
+    });
+  }
+
   function updateSlipUI() {
     const has = slip.length > 0;
     document.body.classList.toggle("has-slip", has);
@@ -573,9 +638,11 @@
     let comb = 1.0;
     slip.forEach(s => { comb *= (s.prob / 100); });
     const pct = +(comb * 100).toFixed(1);
+    const estPayout = Math.round(25 * Math.pow(1.909, slip.length));
 
     document.getElementById("slipCount").textContent = slip.length;
     document.getElementById("slipOdds").textContent = `${pct}% (${probToAmerican(pct)})`;
+    document.getElementById("slipPayout").textContent = `$25 → $${estPayout}`;
     document.getElementById("slipChips").innerHTML = slip.map(s => `
       <div class="s-chip">${s.label} (${s.prob}%) <span onclick="toggleSlip('${s.key}')">×</span></div>
     `).join("");
@@ -627,6 +694,11 @@
       `${legs.map(l => l.label).join(" • ")} (${pct}% | ${probToAmerican(pct)})`;
   }
 
+  function renderDots(dotsStr) {
+    if (!dotsStr) return "";
+    return `<div class="dots-wrap">${dotsStr.split("").map(d => `<span class="g-dot ${d === '1' ? 'hit' : ''}"></span>`).join("")}</div>`;
+  }
+
   function render() {
     const listEl = document.getElementById("cardsList");
     const moreBtn = document.getElementById("loadMoreBtn");
@@ -647,6 +719,7 @@
         const matchQ = !q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.opponent.toLowerCase().includes(q);
         if (!matchQ) return false;
         if (subFilter === "USG" && (p.usage_bump_pct || 0) <= 0) return false;
+        if (subFilter === "HOT" && (p.best_prop?.hits || 0) < 8) return false;
         if (filter === "edge" && (p.best_prop?.prob || 0) < 58 && (p.usage_bump_pct || 0) <= 0) return false;
         if (filter === "slip" && !slip.some(s => s.key.startsWith(`nba-${p.id}`))) return false;
         return true;
@@ -658,20 +731,32 @@
 
       listEl.innerHTML = slice.map(p => {
         const inSlip = slip.some(s => s.key.startsWith(`nba-${p.id}`));
+        const bp = p.best_prop || {};
         const propsToShow = ["PTS", "REB", "AST", "PRA"].includes(subFilter)
           ? (p.all_props || []).filter(m => m.stat === subFilter)
           : (p.all_props || []);
+
+        const tagsHtml = (p.tags || []).map(t =>
+          `<span class="s-tag ${t.includes('DEF') || t.includes('B2B') ? 'cyan' : ''}">${t}</span>`
+        ).join("");
 
         return `
           <article class="card ${inSlip ? 'in-slip' : ''}">
             <div class="c-head">
               <div>
                 <div class="c-name">${p.player} <span class="c-meta">• ${p.team} vs ${p.opponent} (${p.avg_min}m)</span></div>
+                ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ''}
               </div>
-              ${p.usage_bump_pct > 0
-                ? `<span class="usg-tag">⚡ +${p.usage_bump_pct}% Usg</span>`
-                : `<span class="c-meta">O/U ${p.game_total}</span>`}
+              <span class="c-meta">O/U ${p.game_total}</span>
             </div>
+
+            ${bp.dots ? `
+              <div class="streak-bar">
+                <span><strong>${bp.market}</strong> Recent Form: <strong style="color:var(--emerald);">${bp.hit_str}</strong></span>
+                ${renderDots(bp.dots)}
+              </div>
+            ` : ''}
+
             <div class="prop-grid" style="${propsToShow.length === 1 ? 'grid-template-columns:1fr;' : ''}">
               ${propsToShow.map(m => {
                 const k = `nba-${p.id}-${m.stat}`;
@@ -683,7 +768,10 @@
                       <span>${m.market}</span>
                       <span class="sim-hint">Sim: ${m.proj}</span>
                     </div>
-                    <span class="prob-val">${m.prob}%</span>
+                    <div class="prob-val">
+                      <span>${m.prob}%</span>
+                      ${m.hit_str ? `<span class="hit-mini">${m.hit_str}</span>` : ''}
+                    </div>
                   </button>
                 `;
               }).join("")}
