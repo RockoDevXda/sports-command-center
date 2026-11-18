@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0f17" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>SimLab Command Center | NCAA & NBA</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #131a26;
+      --border: #243044;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --ncaa: #10b981;
+      --ncaa-dim: rgba(16, 185, 129, 0.16);
+      --nba: #f97316;
+      --nba-dim: rgba(249, 115, 22, 0.16);
+      --blue: #3b82f6;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding-bottom: 120px;
+    }
+    header {
+      background: rgba(11, 15, 23, 0.92);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(12px);
+    }
+    .header-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand h1 { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); font-size: 0.78rem; }
+    .sport-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: #080b11;
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active-ncaa { background: var(--ncaa); color: #052e16; }
+    .tab-btn.active-nba { background: var(--nba); color: #fff; }
+    .controls {
+      max-width: 1360px;
+      margin: 14px auto 8px;
+      padding: 0 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .ctrl-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .ctrl-box label {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+    .ctrl-box input, .ctrl-box select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 0.88rem;
+    }
+    .grid {
+      max-width: 1360px;
+      margin: 12px auto;
+      padding: 0 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card.in-slip-ncaa { border-color: var(--ncaa); box-shadow: 0 0 0 1px var(--ncaa); }
+    .card.in-slip-nba { border-color: var(--nba); box-shadow: 0 0 0 1px var(--nba); }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.74rem;
+      color: var(--muted);
+      gap: 6px;
+    }
+    .pill {
+      background: #1e293b;
+      color: #cbd5e1;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .edge-badge {
+      background: var(--ncaa-dim);
+      color: var(--ncaa);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 700;
+      font-size: 0.72rem;
+    }
+    .bump-badge {
+      background: var(--nba-dim);
+      color: var(--nba);
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 700;
+      font-size: 0.72rem;
+    }
+    .team-row, .prop-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(11, 15, 23, 0.65);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      background: rgba(11, 15, 23, 0.65);
+      padding: 7px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-strip span { display: block; font-size: 0.68rem; color: var(--muted); }
+    .stat-strip strong { font-size: 0.9rem; }
+    .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    button.pick-btn {
+      flex: 1;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #1e293b;
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    button.pick-btn.selected-ncaa { background: var(--ncaa); color: #052e16; border-color: var(--ncaa); }
+    button.pick-btn.selected-nba { background: var(--nba); color: #fff; border-color: var(--nba); }
+    .parlay-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0f172a;
+      border-top: 1px solid #38bdf8;
+      padding: 10px 16px;
+      z-index: 50;
+      box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.65);
+    }
+    .parlay-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .slip-legs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .leg-chip {
+      background: #1e293b;
+      border: 1px solid #38bdf8;
+      color: var(--text);
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .leg-chip span { cursor: pointer; color: var(--danger); font-weight: 800; }
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="top-row">
+      <div class="brand">
+        <h1>⚡ SimLab Command Center</h1>
+        <div class="sub" id="syncStatus">Syncing NCAA & NBA engines...</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button id="installBtn" style="display:none; background:#38bdf8; color:#082f49; border:none; padding:6px 11px; border-radius:7px; font-weight:700; font-size:0.78rem; cursor:pointer;">📲 Install App</button>
+        <button onclick="loadAllData(true)" style="background:#1e293b; color:var(--text); border:1px solid var(--border); padding:6px 11px; border-radius:7px; font-weight:700; font-size:0.78rem; cursor:pointer;">↻ Sync</button>
+      </div>
+    </div>
+    <div class="sport-tabs">
+      <button class="tab-btn active-ncaa" id="tabNcaa" onclick="switchSport('ncaa')">🏀 NCAA D1 Slate (<span id="ncaaCount">0</span>)</button>
+      <button class="tab-btn" id="tabNba" onclick="switchSport('nba')">🔥 NBA Player Props (<span id="nbaCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<section class="controls">
+  <div class="ctrl-box">
+    <label>Search Team / Player</label>
+    <input type="text" id="searchInput" placeholder="Search..." oninput="render()" />
+  </div>
+  <div class="ctrl-box">
+    <label>Quick Filter</label>
+    <select id="filterSelect" onchange="render()">
+      <option value="all">All Matchups / Players</option>
+      <option value="edges">Top Model Edges Only</option>
+      <option value="slip">On My Cross-Sport Slip</option>
+    </select>
+  </div>
+</section>
+
+<main class="grid" id="mainGrid"></main>
+
+<div class="parlay-bar">
+  <div class="parlay-inner">
+    <div class="slip-legs" id="slipLegs">
+      <strong style="font-size:0.82rem; color:#38bdf8;">🎯 Cross-Sport Slip:</strong>
+      <span style="font-size:0.78rem; color:var(--muted);">Tap any pick to build an NCAA + NBA parlay</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="text-align:right;">
+        <div style="font-size:0.7rem; color:var(--muted);">Combined Hit Rate</div>
+        <div style="font-size:0.98rem; font-weight:800; color:#38bdf8;" id="parlaySummary">0.0% (N/A)</div>
+      </div>
+      <button onclick="clearSlip()" style="background:#1e293b; color:var(--text); border:1px solid var(--border); padding:6px 10px; border-radius:7px; font-size:0.76rem; font-weight:700; cursor:pointer;">Clear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const GITHUB_USER = "RockoDevXda";
+  const NCAA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/ncaa-sim/main/daily_slate.json`;
+  const NBA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba-props-sim/main/nba_props_slate.json`;
+
+  let activeSport = "ncaa";
+  let ncaaGames = [];
+  let nbaPlayers = [];
+  let slip = []; // { key, sport, label, prob }
+  let deferredPrompt = null;
+
+  // Register Service Worker for PWA / Home-Screen Install
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById("installBtn").style.display = "inline-block";
+  });
+
+  document.getElementById("installBtn").addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById("installBtn").style.display = "none";
+  });
+
+  function probToAmerican(pct) {
+    const p = pct / 100;
+    if (p <= 0 || p >= 1) return "N/A";
+    return p >= 0.5 ? `${Math.round(-100 * p / (1 - p))}` : `+${Math.round(100 * (1 - p) / p)}`;
+  }
+
+  function switchSport(sport) {
+    activeSport = sport;
+    document.getElementById("tabNcaa").className = sport === "ncaa" ? "tab-btn active-ncaa" : "tab-btn";
+    document.getElementById("tabNba").className = sport === "nba" ? "tab-btn active-nba" : "tab-btn";
+    render();
+  }
+
+  function toggleSlipItem(key, sport, label, prob) {
+    const idx = slip.findIndex((s) => s.key === key);
+    if (idx !== -1) {
+      slip.splice(idx, 1);
+    } else {
+      slip.push({ key, sport, label, prob });
+    }
+    updateSlipUI();
+    render();
+  }
+
+  function clearSlip() {
+    slip = [];
+    updateSlipUI();
+    render();
+  }
+
+  function updateSlipUI() {
+    const legsEl = document.getElementById("slipLegs");
+    const sumEl = document.getElementById("parlaySummary");
+    if (slip.length === 0) {
+      legsEl.innerHTML = `<strong style="font-size:0.82rem; color:#38bdf8;">🎯 Cross-Sport Slip:</strong>
+        <span style="font-size:0.78rem; color:var(--muted);">Tap any pick to build an NCAA + NBA parlay</span>`;
+      sumEl.textContent = "0.0% (N/A)";
+      return;
+    }
+    let combined = 1.0;
+    slip.forEach((s) => { combined *= (s.prob / 100); });
+    const pct = +(combined * 100).toFixed(1);
+    sumEl.textContent = `${pct}% (${probToAmerican(pct)})`;
+    legsEl.innerHTML = `<strong style="font-size:0.82rem; color:#38bdf8;">🎯 Slip (${slip.length}):</strong>` +
+      slip.map((s) => `<div class="leg-chip">${s.sport === 'ncaa' ? '🏀' : '🔥'} ${s.label} (${s.prob}%) <span onclick="toggleSlipItem('${s.key}')">×</span></div>`).join("");
+  }
+
+  function render() {
+    const grid = document.getElementById("mainGrid");
+    const q = document.getElementById("searchInput").value.toLowerCase().trim();
+    const filter = document.getElementById("filterSelect").value;
+
+    if (activeSport === "ncaa") {
+      const list = ncaaGames.filter((g) => {
+        const match = !q || g.away_team.toLowerCase().includes(q) || g.home_team.toLowerCase().includes(q);
+        if (!match) return false;
+        if (filter === "slip") return slip.some((s) => s.key.startsWith(`ncaa-${g.id}`));
+        if (filter === "edges") return (g.spread_cover_pct || 0) >= 58 || (g.favored_prob || 0) >= 72;
+        return true;
+      });
+
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">No NCAA matchups found. Make sure your ncaa-sim repo is Public and has run at least once.</div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map((g) => {
+        const keySpread = `ncaa-${g.id}-ats`;
+        const keyMl = `ncaa-${g.id}-ml`;
+        const hasSpread = slip.some((s) => s.key === keySpread);
+        const hasMl = slip.some((s) => s.key === keyMl);
+        const inSlip = hasSpread || hasMl;
+
+        return `
+          <article class="card ${inSlip ? 'in-slip-ncaa' : ''}">
+            <div class="card-top">
+              <span>${g.tipoff || ''} • ${g.neutral ? 'Neutral' : (g.venue || '')}</span>
+              ${g.has_line ? `<span class="edge-badge">+${g.edge_pts} pt edge • ${g.market_line}</span>` : `<span class="pill">Line Pending</span>`}
+            </div>
+            <div class="team-row">
+              <div><strong>${g.away_team}</strong> <span style="color:var(--muted); font-size:0.75rem;">(${g.away_record || ''})</span></div>
+              <div style="text-align:right;"><strong>${g.away_proj}</strong> <span style="color:var(--ncaa); font-size:0.78rem;">(${g.away_win_pct}%)</span></div>
+            </div>
+            <div class="team-row">
+              <div><strong>${g.home_team}</strong> <span style="color:var(--muted); font-size:0.75rem;">(${g.home_record || ''})</span></div>
+              <div style="text-align:right;"><strong>${g.home_proj}</strong> <span style="color:var(--ncaa); font-size:0.78rem;">(${g.home_win_pct}%)</span></div>
+            </div>
+            <div class="btn-row">
+              ${g.has_line ? `<button class="pick-btn ${hasSpread ? 'selected-ncaa' : ''}" onclick="toggleSlipItem('${keySpread}','ncaa','${g.spread_pick}',${g.spread_cover_pct})">+ ${g.spread_pick} (${g.spread_cover_pct}%)</button>` : ''}
+              <button class="pick-btn ${hasMl ? 'selected-ncaa' : ''}" onclick="toggleSlipItem('${keyMl}','ncaa','${g.favored_team} ML',${g.favored_prob})">+ ${g.favored_team} ML (${g.favored_prob}%)</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    } else {
+      const sorted = [...nbaPlayers].sort((a, b) => (b.best_prop?.prob || 0) - (a.best_prop?.prob || 0));
+      const list = sorted.filter((p) => {
+        const match = !q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.opponent.toLowerCase().includes(q);
+        if (!match) return false;
+        if (filter === "slip") return slip.some((s) => s.key.startsWith(`nba-${p.id}`));
+        if (filter === "edges") return (p.usage_bump_pct || 0) > 0 || (p.best_prop?.prob || 0) >= 58;
+        return true;
+      });
+
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">No NBA player props found. Make sure your nba-props-sim repo is Public and has run at least once.</div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map((p) => {
+        const inSlip = slip.some((s) => s.key.startsWith(`nba-${p.id}`));
+        return `
+          <article class="card ${inSlip ? 'in-slip-nba' : ''}">
+            <div class="card-top">
+              <span><strong>${p.team}</strong> (${p.pos}) vs ${p.opponent} • O/U ${p.game_total}</span>
+              ${p.usage_bump_pct > 0 ? `<span class="bump-badge">⚡ +${p.usage_bump_pct}% Usg</span>` : `<span class="pill">${p.matchup}</span>`}
+            </div>
+            <div>
+              <strong style="font-size:1.02rem;">${p.player}</strong>
+              <span style="color:var(--muted); font-size:0.76rem; margin-left:6px;">Proj ${p.avg_min}m</span>
+            </div>
+            <div class="stat-strip">
+              <div><span>PTS</span><strong>${p.proj_pts}</strong></div>
+              <div><span>REB</span><strong>${p.proj_reb}</strong></div>
+              <div><span>AST</span><strong>${p.proj_ast}</strong></div>
+              <div><span>3PM</span><strong>${p.proj_3pm}</strong></div>
+              <div><span>PRA</span><strong>${p.proj_pra}</strong></div>
+            </div>
+            <div class="btn-row">
+              ${(p.all_props || []).map((m) => {
+                const k = `nba-${p.id}-${m.stat}`;
+                const sel = slip.some((s) => s.key === k);
+                return `<button class="pick-btn ${sel ? 'selected-nba' : ''}" onclick="toggleSlipItem('${k}','nba','${p.player} ${m.market}',${m.prob})">${m.market} (${m.prob}%)</button>`;
+              }).join("")}
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+  }
+
+  async function loadAllData(force = false) {
+    const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
+    document.getElementById("syncStatus").textContent = "Fetching live NCAA & NBA slates...";
+    try {
+      const [ncaaRes, nbaRes] = await Promise.allSettled([
+        fetch(NCAA_JSON_URL + bust),
+        fetch(NBA_JSON_URL + bust)
+      ]);
+      if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) {
+        ncaaGames = await ncaaRes.value.json();
+      }
+      if (nbaRes.status === "fulfilled" && nbaRes.value.ok) {
+        nbaPlayers = await nbaRes.value.json();
+      }
+      document.getElementById("ncaaCount").textContent = ncaaGames.length;
+      document.getElementById("nbaCount").textContent = nbaPlayers.length;
+      const ts = ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
+      document.getElementById("syncStatus").textContent = `Synced • Last Sim: ${ts}`;
+      render();
+    } catch (e) {
+      document.getElementById("syncStatus").textContent = "Offline mode (showing cached slate)";
+    }
+  }
+
+  loadAllData();
+</script>
+</body>
+</html>
