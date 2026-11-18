@@ -162,7 +162,7 @@
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <span style="font-size:0.7rem; color:var(--muted);" id="livePollStatus">Live ESPN auto-tracker active (45s)</span>
-      <button class="btn-sm" style="padding:4px 9px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="refreshTrackedBets(true)">⚡ Update Live Scores</button>
+      <button class="btn-sm" style="padding:4px 9px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="refreshTrackedBets()">⚡ Update Live Scores</button>
     </div>
   </div>
 
@@ -186,51 +186,6 @@
   <div class="slip-chips" id="slipChips"></div>
 </div>
 
-<script>
-  const GITHUB_USER = "RockoDevXda";
-  const NCAA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/ncaa-sim/main/daily_slate.json`;
-  const NBA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba-props-sim/main/nba_props_slate.json`;
-  const STORAGE_KEY = "simlab_tracked_bets_v1";
-
-  let activeSport = "nba", subFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
-  let ncaaGames = [], nbaPlayers = [], topParlayLegs = [], slip = [], pickRegistry = {};
-  let trackedBets = loadStoredBets(), livePollTimer = null, deferredPrompt = null;
-
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
-  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById("installBtn").style.display = "inline-block"; });
-  document.getElementById("installBtn").addEventListener("click", async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null;
-    document.getElementById("installBtn").style.display = "none";
-  });
-
-  function escHtml(s) { return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
-  function loadStoredBets() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch (e) { return []; } }
-  function persistBets() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trackedBets)); } catch (e) {} document.getElementById("betsCount").textContent = trackedBets.length; }
-  function probToAmerican(pct) { const p = pct / 100; if (p <= 0 || p >= 1) return "N/A"; return p >= 0.5 ? `${Math.round(-100 * p / (1 - p))}` : `+${Math.round(100 * (1 - p) / p)}`; }
-
-  function switchSport(sport) {
-    activeSport = sport; visibleLimit = 25;
-    document.getElementById("tabNba").className = sport === "nba" ? "tab active-nba" : "tab";
-    document.getElementById("tabNcaa").className = sport === "ncaa" ? "tab active-ncaa" : "tab";
-    document.getElementById("tabBets").className = sport === "bets" ? "tab active-bets" : "tab";
-    document.getElementById("marketControls").style.display = sport === "bets" ? "none" : "block";
-    document.getElementById("betsControls").style.display = sport === "bets" ? "block" : "none";
-    document.getElementById("nbaChips").style.display = sport === "nba" ? "flex" : "none";
-    document.getElementById("ncaaChips").style.display = sport === "ncaa" ? "flex" : "none";
-    if (sport === "bets") { refreshTrackedBets(true); startLivePoller(); } else { stopLivePoller(); render(); }
-  }
-
-  function startLivePoller() { stopLivePoller(); livePollTimer = setInterval(() => { if (activeSport === "bets" && trackedBets.some(b => b.status !== "won" && b.status !== "lost")) refreshTrackedBets(false); }, 45000); }
-  function stopLivePoller() { if (livePollTimer) { clearInterval(livePollTimer); livePollTimer = null; } }
-  function handleManualRefresh() { if (activeSport === "bets") refreshTrackedBets(true); else loadAllData(true); }
-  function setSubFilter(val, btn) { subFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
-  function setNcaaFilter(val, btn) { ncaaFilter = val; visibleLimit = 25; document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
-  function resetAndRender() { visibleLimit = 25; render(); }
-  function showMore() { visibleLimit += 25; render(); }
-  function registerPick(key, label, prob, meta) { pickRegistry[key] = { key, label, prob, meta }; }
-
-  function toggleSlipByKey(key) {
-    const idx = slip.findIndex(s => s.key === key);
-    if (idx !== -1) slip.splice(idx, 1);
-    else if (pick
+<script src="./app.js"></script>
+</body>
+</html>
