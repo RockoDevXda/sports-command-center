@@ -267,4 +267,224 @@ function updateSlipUI(recalcDefaultOdds = true) {
     } else {
       let decParlay = 1.0;
       slip.forEach(s => {
-        decParlay *= (s.meta?.isAlt && s.meta?.fairOdds) ? americanToDecimal(s.meta
+        decParlay *= (s.meta?.isAlt && s.meta?.fairOdds) ? americanToDecimal(s.meta.fairOdds) : 1.909;
+      });
+      oddsEl.value = `+${Math.round((decParlay - 1) * 100)}`;
+    }
+  }
+
+  let combProb = 1.0;
+  slip.forEach(s => { combProb *= (s.prob / 100); });
+  const q = 1.0 - combProb;
+  const decOdds = americanToDecimal(oddsEl.value);
+  const b = decOdds - 1.0;
+
+  const bankroll = Math.max(1, parseFloat(document.getElementById("bankrollInput").value) || 500);
+  const kellyMult = parseFloat(document.getElementById("kellyFracSelect").value) || 0.25;
+  const rawKelly = b > 0 ? ((b * combProb - q) / b) : 0;
+  const adjKellyPct = Math.max(0, rawKelly * kellyMult);
+  const evPct = +((combProb * b - q) * 100).toFixed(1);
+
+  lastKellyDollar = adjKellyPct > 0 ? Math.max(1, Math.round(bankroll * adjKellyPct)) : 0;
+  const kBtn = document.getElementById("kellyApplyBtn");
+  if (lastKellyDollar > 0) {
+    kBtn.className = "kelly-pill";
+    kBtn.textContent = `⚡ Kelly: $${lastKellyDollar} (${(adjKellyPct * 100).toFixed(1)}% | +${evPct}% EV)`;
+  } else {
+    kBtn.className = "kelly-pill no-edge";
+    kBtn.textContent = `⚠️ NO +EV EDGE (${evPct}% EV)`;
+  }
+
+  const stake = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
+  const estPayout = +(stake * decOdds).toFixed(2);
+  document.getElementById("slipCount").textContent = slip.length;
+  document.getElementById("slipPayout").textContent = `→ $${estPayout}`;
+  document.getElementById("slipChips").innerHTML = slip.map(s => `<div class="s-chip">${escHtml(s.label)} (${s.prob}%) <span data-key="${escHtml(s.key)}" onclick="toggleSlipByKey(this.dataset.key)">×</span></div>`).join("");
+}
+
+function saveTrackedBet() {
+  if (!slip.length) return;
+  const stake = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
+  const decOdds = americanToDecimal(document.getElementById("bookOddsInput").value);
+  const payout = +(stake * decOdds).toFixed(2);
+  const todayIso = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  trackedBets.unshift({
+    id: "bet-" + Date.now(),
+    createdAt: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    dateStr: todayIso, stake, payout, status: "pending",
+    legs: slip.map(s => ({ key: s.key, label: s.label, prob: s.prob, meta: s.meta || {}, status: "pending", liveScore: "Scheduled", currentVal: 0, targetVal: s.meta?.line || 0, clock: "" }))
+  });
+  persistBets();
+  slip = [];
+  updateSlipUI(true);
+  switchSport("bets");
+}
+
+function deleteTrackedBet(betId) {
+  trackedBets = trackedBets.filter(b => b.id !== betId);
+  persistBets();
+  renderBetsTab();
+}
+
+function buildEvBoard() {
+  const items = [];
+
+  for (const p of nbaPlayers) {
+    const pidStr = String(p.id);
+    for (const m of (p.all_props || [])) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(m.prob, 1.909);
+      if (evPct >= 3.0) {
+        const side = m.side || "O";
+        const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
+        const meta = {
+          sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+          stat: m.stat, side, line: m.line, isAlt: false, fairOdds: m.fair_odds, marketKey: m.market
+        };
+        registerPick(k, `${p.player} ${m.market}`, m.prob, meta);
+        items.push({
+          key: k, category: "PROPS", badge: "🔥 NBA PROP",
+          title: `${p.player} ${m.market}`,
+          subtitle: `${p.team} vs ${p.opponent} • Sim: ${m.proj} • L10: ${m.hit_str || "N/A"}`,
+          tags: p.tags || [], prob: m.prob, evPct, qKellyPct, dots: m.dots || "", gameId: p.game_id
+        });
+      }
+    }
+  }
+
+  for (const g of nbaGames) {
+    const awayLbl = g.away_abbr || g.away_short;
+    const homeLbl = g.home_abbr || g.home_short;
+    if (g.has_line) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `nbagame-${g.id}-ats`;
+        const meta = { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
+        items.push({
+          key: k, category: "NBAGAMES", badge: "🏀 NBA SPREAD",
+          title: g.spread_pick,
+          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+        });
+      }
+    }
+    if (g.has_total) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `nbagame-${g.id}-tot`;
+        const meta = { sport: "nbagame", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
+        items.push({
+          key: k, category: "NBAGAMES", badge: "🏀 NBA TOTAL",
+          title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
+          subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+        });
+      }
+    }
+  }
+
+  for (const g of ncaaGames) {
+    if (g.verified_d1 === false) continue;
+    const awayLbl = g.away_short || g.away_team;
+    const homeLbl = g.home_short || g.home_team;
+    if (g.has_line && Math.abs(g.home_spread || 0) <= 24.5) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `ncaa-${g.id}-ats`;
+        const meta = { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
+        items.push({
+          key: k, category: "NCAA", badge: "🏀 NCAA ATS",
+          title: g.spread_pick,
+          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+        });
+      }
+    }
+    if (g.has_total && (g.total_edge_pts || 0) <= 14.0) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `ncaa-${g.id}-tot`;
+        const meta = { sport: "ncaa", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
+        items.push({
+          key: k, category: "NCAA", badge: "🏀 NCAA TOTAL",
+          title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
+          subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+        });
+      }
+    }
+  }
+
+  items.sort((a, b) => b.evPct - a.evPct);
+  evBoard = items;
+  document.getElementById("evCount").textContent = evBoard.length;
+}
+
+function buildTopParlay() {
+  const legs = [], usedGames = new Set();
+  for (const item of evBoard) {
+    if (legs.length >= 4) break;
+    if (!usedGames.has(item.gameId)) {
+      legs.push({ key: item.key, label: item.title, prob: item.prob, meta: pickRegistry[item.key]?.meta || {} });
+      usedGames.add(item.gameId);
+    }
+  }
+  topParlayLegs = legs;
+  const banner = document.getElementById("heroParlay");
+  if (legs.length < 2) { banner.style.display = "none"; return; }
+  let c = 1.0;
+  legs.forEach(l => { c *= (l.prob / 100); });
+  const pct = +(c * 100).toFixed(1);
+  banner.style.display = "flex";
+  document.getElementById("heroParlaySub").textContent = `${legs.map(l => l.label).join(" • ")} (${pct}% | ${probToAmerican(pct)})`;
+}
+
+async function refreshTrackedBets() {
+  const statusEl = document.getElementById("livePollStatus");
+  if (statusEl) statusEl.textContent = "Fetching live ESPN scores & box scores...";
+  const datesToFetch = new Set([new Date().toISOString().slice(0, 10).replace(/-/g, "")]);
+  trackedBets.forEach(b => { if (b.dateStr) datesToFetch.add(b.dateStr); });
+  const nbaEvents = {}, ncaaEvents = {}, nbaBoxCache = {};
+  try {
+    for (const d of datesToFetch) {
+      const [nbaRes, ncaaRes] = await Promise.allSettled([
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${d}`),
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${d}&groups=50&limit=200`)
+      ]);
+      if (nbaRes.status === "fulfilled" && nbaRes.value.ok) ((await nbaRes.value.json()).events || []).forEach(ev => { nbaEvents[String(ev.id)] = ev; });
+      if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) ((await ncaaRes.value.json()).events || []).forEach(ev => { ncaaEvents[String(ev.id)] = ev; });
+    }
+    for (const bet of trackedBets) {
+      for (const leg of bet.legs) {
+        const m = leg.meta || {}, gid = String(m.gameId || "");
+        if (m.sport === "nba" && gid && nbaEvents[gid]) {
+          const ev = nbaEvents[gid], state = ev.status?.type?.state || "pre", detail = ev.status?.type?.shortDetail || "";
+          const comp = ev.competitions?.[0], away = comp?.competitors?.find(c => c.homeAway === "away"), home = comp?.competitors?.find(c => c.homeAway === "home");
+          leg.clock = `${away?.team?.abbreviation || ""} ${away?.score || 0} - ${home?.team?.abbreviation || ""} ${home?.score || 0} • ${detail}`;
+          const isUnder = m.side === "U";
+          if (state === "pre") { leg.status = "pending"; leg.liveScore = `0 / ${m.line} ${m.stat}`; }
+          else {
+            if (!nbaBoxCache[gid]) { try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gid}`); if (r.ok) nbaBoxCache[gid] = await r.json(); } catch (e) {} }
+            const val = extractNbaPlayerStat(nbaBoxCache[gid], String(m.playerId || ""), m.playerName, m.stat);
+            leg.currentVal = val; leg.targetVal = m.line; leg.liveScore = `${val} / ${m.line} ${m.stat}`;
+            if (isUnder) {
+              if (val > m.line) leg.status = "miss";
+              else leg.status = state === "post" ? "hit" : "live";
+            } else {
+              leg.status = state === "post" ? (val > m.line ? "hit" : "miss") : (val > m.line ? "hit" : "live");
+            }
+          }
+        } else if ((m.sport === "ncaa" || m.sport === "nbagame") && gid) {
+          const ev = m.sport === "nbagame" ? nbaEvents[gid] : ncaaEvents[gid];
+          if (!ev) continue;
+          const state = ev.status?.type?.state || "pre", detail = ev.status?.type?.shortDetail || "";
+          const comp = ev.competitions?.[0], away = comp?.competitors?.find(c => c.homeAway === "away"), home = comp?.competitors?.find(c => c.homeAway === "home");
+          const aS = parseFloat(away?.score || 0), hS = parseFloat(home?.score || 0);
+          const sStr = `${m.awayShort || away?.team?.abbreviation} ${aS} - ${m.homeShort || home?.team?.abbreviation} ${hS}`;
+          leg.clock = detail;
+          if (state === "pre") { leg.status = "pending"; leg.liveScore = "Tipoff scheduled"; }
+          else if (m.betType === "total") {
+            const comb
