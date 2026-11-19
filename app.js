@@ -2,9 +2,12 @@ const GITHUB_USER = "RockoDevXda";
 const NCAA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/ncaa-sim/main/daily_slate.json`;
 const NBA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba-props-sim/main/nba_props_slate.json`;
 const STORAGE_KEY = "simlab_tracked_bets_v1";
+const WATCH_KEY = "simlab_watchlist_v1";
 
 let activeSport = "nba", subFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
 let ncaaGames = [], nbaPlayers = [], topParlayLegs = [], slip = [], pickRegistry = {};
+let activePropByPlayer = {};
+let watchlist = loadWatchlist();
 let trackedBets = loadStoredBets(), livePollTimer = null, deferredPrompt = null;
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -20,6 +23,18 @@ function escHtml(s) {
 }
 function loadStoredBets() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch (e) { return []; }
+}
+function loadWatchlist() {
+  try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch (e) { return []; }
+}
+function toggleWatch(playerId, e) {
+  if (e) e.stopPropagation();
+  const idStr = String(playerId);
+  const idx = watchlist.indexOf(idStr);
+  if (idx !== -1) watchlist.splice(idx, 1);
+  else watchlist.push(idStr);
+  try { localStorage.setItem(WATCH_KEY, JSON.stringify(watchlist)); } catch (err) {}
+  render();
 }
 function persistBets() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trackedBets)); } catch (e) {}
@@ -61,9 +76,13 @@ function showMore() { visibleLimit += 25; render(); }
 function registerPick(key, label, prob, meta) { pickRegistry[key] = { key, label, prob, meta }; }
 
 function toggleSlipByKey(key) {
+  const pick = pickRegistry[key];
+  if (pick?.meta?.sport === "nba" && pick.meta.playerId) {
+    activePropByPlayer[String(pick.meta.playerId)] = pick.meta.stat;
+  }
   const idx = slip.findIndex(s => s.key === key);
   if (idx !== -1) slip.splice(idx, 1);
-  else if (pickRegistry[key]) slip.push({ ...pickRegistry[key] });
+  else if (pick) slip.push({ ...pick });
   updateSlipUI();
   render();
 }
@@ -280,6 +299,7 @@ function render() {
     });
     const filtered = sorted.filter(p => {
       if (q && !p.player.toLowerCase().includes(q) && !p.team.toLowerCase().includes(q) && !p.opponent.toLowerCase().includes(q)) return false;
+      if (subFilter === "WATCH" && !watchlist.includes(String(p.id))) return false;
       if (subFilter === "USG" && (p.usage_bump_pct || 0) <= 0) return false;
       if (subFilter === "HOT" && (p.best_prop?.hits || 0) < 8) return false;
       if (filter === "edge" && (p.best_prop?.prob || 0) < 58 && (p.usage_bump_pct || 0) <= 0) return false;
@@ -290,15 +310,35 @@ function render() {
     moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
     moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
     listEl.innerHTML = slice.map(p => {
-      const inSlip = slip.some(s => s.key.startsWith(`nba-${p.id}`)), bp = p.best_prop || {};
+      const pidStr = String(p.id);
+      const isWatched = watchlist.includes(pidStr);
+      const inSlip = slip.some(s => s.key.startsWith(`nba-${pidStr}`));
+      const selectedStat = activePropByPlayer[pidStr] || (["PTS", "REB", "AST", "PRA"].includes(subFilter) ? subFilter : null);
+      const focusProp = (selectedStat && p.all_props?.find(x => x.stat === selectedStat)) || p.best_prop || {};
       const propsToShow = ["PTS", "REB", "AST", "PRA"].includes(subFilter) ? (p.all_props || []).filter(m => m.stat === subFilter) : (p.all_props || []);
       const tagsHtml = (p.tags || []).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
-      return `<article class="card ${inSlip ? "in-slip" : ""}"><div class="c-head"><div><div class="c-name">${escHtml(p.player)} <span class="c-meta">• ${escHtml(p.team)} vs ${escHtml(p.opponent)} (${p.avg_min}m)</span></div>${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}</div><span class="c-meta">O/U ${p.game_total}</span></div>${bp.dots ? `<div class="streak-bar"><span><strong>${escHtml(bp.market)}</strong> Recent Form: <strong style="color:var(--emerald);">${escHtml(bp.hit_str)}</strong></span>${renderDots(bp.dots)}</div>` : ""}<div class="prop-grid" style="${propsToShow.length === 1 ? "grid-template-columns:1fr;" : ""}">${propsToShow.map(m => {
-        const k = `nba-${p.id}-${m.stat}`;
-        registerPick(k, `${p.player} ${m.market}`, m.prob, { sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player, stat: m.stat, side: m.side || "O", line: m.line });
-        const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
-        return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)"><div><span>${escHtml(m.market)}</span><span class="sim-hint">Sim: ${m.proj}</span></div><div class="prob-val"><span>${m.prob}%</span>${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}</div></button>`;
-      }).join("")}</div></article>`;
+
+      return `<article class="card ${inSlip ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div class="c-name">${escHtml(p.player)} <span class="c-meta">• ${escHtml(p.team)} vs ${escHtml(p.opponent)} (${p.avg_min}m)</span></div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="c-meta">O/U ${p.game_total}</span>
+            <button class="btn-sm" style="padding:2px 6px; font-size:0.75rem; border-color:${isWatched ? "var(--orange)" : "var(--border)"}; color:${isWatched ? "var(--orange)" : "var(--muted)"};" onclick="toggleWatch('${escHtml(pidStr)}', event)">${isWatched ? "★" : "☆"}</button>
+          </div>
+        </div>
+        ${focusProp.dots ? `<div class="streak-bar"><span><strong>${escHtml(focusProp.market)}</strong> Recent Form: <strong style="color:var(--emerald);">${escHtml(focusProp.hit_str)}</strong></span>${renderDots(focusProp.dots)}</div>` : ""}
+        <div class="prop-grid" style="${propsToShow.length === 1 ? "grid-template-columns:1fr;" : ""}">
+          ${propsToShow.map(m => {
+            const k = `nba-${pidStr}-${m.stat}`;
+            registerPick(k, `${p.player} ${m.market}`, m.prob, { sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player, stat: m.stat, side: m.side || "O", line: m.line });
+            const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
+            return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)"><div><span>${escHtml(m.market)}</span><span class="sim-hint">Sim: ${m.proj}</span></div><div class="prob-val"><span>${m.prob}%</span>${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}</div></button>`;
+          }).join("")}
+        </div>
+      </article>`;
     }).join("");
   } else {
     const sorted = [...ncaaGames].sort((a, b) => {
