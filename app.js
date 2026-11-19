@@ -3,12 +3,15 @@ const NCAA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/ncaa-sim
 const NBA_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba-props-sim/main/nba_props_slate.json`;
 const STORAGE_KEY = "simlab_tracked_bets_v1";
 const WATCH_KEY = "simlab_watchlist_v1";
+const BANKROLL_KEY = "simlab_bankroll_v1";
 
 let activeSport = "nba", subFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
 let ncaaGames = [], nbaPlayers = [], topParlayLegs = [], slip = [], pickRegistry = {};
 let activePropByPlayer = {};
-let watchlist = loadWatchlist();
-let trackedBets = loadStoredBets(), livePollTimer = null, deferredPrompt = null;
+let watchlist = loadJson(WATCH_KEY, []);
+let trackedBets = loadJson(STORAGE_KEY, []);
+let lastKellyDollar = 0;
+let livePollTimer = null, deferredPrompt = null;
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 window.addEventListener("beforeinstallprompt", (e) => {
@@ -21,11 +24,8 @@ window.addEventListener("beforeinstallprompt", (e) => {
 function escHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function loadStoredBets() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch (e) { return []; }
-}
-function loadWatchlist() {
-  try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch (e) { return []; }
+function loadJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
 function toggleWatch(playerId, e) {
   if (e) e.stopPropagation();
@@ -45,6 +45,24 @@ function probToAmerican(pct) {
   const p = pct / 100;
   if (p <= 0 || p >= 1) return "N/A";
   return p >= 0.5 ? `${Math.round(-100 * p / (1 - p))}` : `+${Math.round(100 * (1 - p) / p)}`;
+}
+function americanToDecimal(am) {
+  const n = parseFloat(am);
+  if (isNaN(n) || n === 0 || (n > -100 && n < 100)) return 1.909;
+  return n > 0 ? 1 + (n / 100) : 1 + (100 / Math.abs(n));
+}
+
+function saveBankrollAndCalc() {
+  const br = Math.max(1, parseFloat(document.getElementById("bankrollInput").value) || 500);
+  try { localStorage.setItem(BANKROLL_KEY, String(br)); } catch (e) {}
+  updateSlipUI(false);
+}
+
+function applyKellyStake() {
+  if (lastKellyDollar > 0) {
+    document.getElementById("stakeInput").value = lastKellyDollar;
+    updateSlipUI(false);
+  }
 }
 
 function switchSport(sport) {
@@ -83,27 +101,65 @@ function toggleSlipByKey(key) {
   const idx = slip.findIndex(s => s.key === key);
   if (idx !== -1) slip.splice(idx, 1);
   else if (pick) slip.push({ ...pick });
-  updateSlipUI();
+  updateSlipUI(true);
   render();
 }
-function clearSlip() { slip = []; updateSlipUI(); render(); }
-function loadTopParlay() { if (!topParlayLegs.length) return; slip = topParlayLegs.map(x => ({ ...x })); updateSlipUI(); render(); }
+function clearSlip() { slip = []; updateSlipUI(true); render(); }
+function loadTopParlay() { if (!topParlayLegs.length) return; slip = topParlayLegs.map(x => ({ ...x })); updateSlipUI(true); render(); }
 
 function copySlipText() {
   if (!slip.length) return;
   let comb = 1.0;
   slip.forEach(s => { comb *= (s.prob / 100); });
   const pct = +(comb * 100).toFixed(1);
-  const lines = [`🎯 SimLab ${slip.length}-Leg Parlay (${pct}% | Fair ${probToAmerican(pct)}):`, ...slip.map((s, i) => `${i + 1}. ${s.label} (${s.prob}%)`)].join("\n");
+  const oddsVal = document.getElementById("bookOddsInput").value;
+  const stakeVal = document.getElementById("stakeInput").value;
+  const lines = [
+    `🎯 SimLab ${slip.length}-Leg Slip (${pct}% Hit | Odds ${oddsVal} | Stake $${stakeVal}):`,
+    ...slip.map((s, i) => `${i + 1}. ${s.label} (${s.prob}%)`)
+  ].join("\n");
   if (navigator.clipboard) navigator.clipboard.writeText(lines).then(() => { const b = document.getElementById("copySlipBtn"); b.textContent = "✓"; setTimeout(() => { b.textContent = "📋"; }, 1600); });
 }
 
-function updateSlipUI() {
+function updateSlipUI(recalcDefaultOdds = true) {
   const has = slip.length > 0;
   document.body.classList.toggle("has-slip", has);
   if (!has) return;
+
+  const oddsEl = document.getElementById("bookOddsInput");
+  if (recalcDefaultOdds) {
+    if (slip.length === 1) {
+      oddsEl.value = "-110";
+    } else {
+      const decParlay = Math.pow(1.909, slip.length);
+      oddsEl.value = `+${Math.round((decParlay - 1) * 100)}`;
+    }
+  }
+
+  let combProb = 1.0;
+  slip.forEach(s => { combProb *= (s.prob / 100); });
+  const q = 1.0 - combProb;
+  const decOdds = americanToDecimal(oddsEl.value);
+  const b = decOdds - 1.0;
+
+  const bankroll = Math.max(1, parseFloat(document.getElementById("bankrollInput").value) || 500);
+  const kellyMult = parseFloat(document.getElementById("kellyFracSelect").value) || 0.25;
+  const rawKelly = b > 0 ? ((b * combProb - q) / b) : 0;
+  const adjKellyPct = Math.max(0, rawKelly * kellyMult);
+  const evPct = +((combProb * b - q) * 100).toFixed(1);
+
+  lastKellyDollar = adjKellyPct > 0 ? Math.max(1, Math.round(bankroll * adjKellyPct)) : 0;
+  const kBtn = document.getElementById("kellyApplyBtn");
+  if (lastKellyDollar > 0) {
+    kBtn.className = "kelly-pill";
+    kBtn.textContent = `⚡ Kelly: $${lastKellyDollar} (${(adjKellyPct * 100).toFixed(1)}% | +${evPct}% EV)`;
+  } else {
+    kBtn.className = "kelly-pill no-edge";
+    kBtn.textContent = `⚠️ NO +EV EDGE (${evPct}% EV)`;
+  }
+
   const stake = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
-  const estPayout = +(stake * Math.pow(1.909, slip.length)).toFixed(2);
+  const estPayout = +(stake * decOdds).toFixed(2);
   document.getElementById("slipCount").textContent = slip.length;
   document.getElementById("slipPayout").textContent = `→ $${estPayout}`;
   document.getElementById("slipChips").innerHTML = slip.map(s => `<div class="s-chip">${escHtml(s.label)} (${s.prob}%) <span data-key="${escHtml(s.key)}" onclick="toggleSlipByKey(this.dataset.key)">×</span></div>`).join("");
@@ -112,7 +168,8 @@ function updateSlipUI() {
 function saveTrackedBet() {
   if (!slip.length) return;
   const stake = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
-  const payout = +(stake * Math.pow(1.909, slip.length)).toFixed(2);
+  const decOdds = americanToDecimal(document.getElementById("bookOddsInput").value);
+  const payout = +(stake * decOdds).toFixed(2);
   const todayIso = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   trackedBets.unshift({
     id: "bet-" + Date.now(),
@@ -122,7 +179,7 @@ function saveTrackedBet() {
   });
   persistBets();
   slip = [];
-  updateSlipUI();
+  updateSlipUI(true);
   switchSport("bets");
 }
 
@@ -272,7 +329,7 @@ function renderBetsTab() {
   document.getElementById("statRecord").textContent = `${wins}-${losses}`;
 
   if (!trackedBets.length) {
-    listEl.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; padding:24px 16px;"><div style="font-size:0.95rem; font-weight:800; margin-bottom:4px;">No Tracked Bets Yet</div><div style="font-size:0.76rem; color:var(--sub);">Tap any props or spreads in NBA / NCAA, set your stake in the bottom drawer, and tap <strong>📌 Track Bet</strong> to sweat live stats here.</div></div>`;
+    listEl.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; padding:24px 16px;"><div style="font-size:0.95rem; font-weight:800; margin-bottom:4px;">No Tracked Bets Yet</div><div style="font-size:0.76rem; color:var(--sub);">Tap any props or spreads in NBA / NCAA, apply your Kelly stake in the bottom drawer, and tap <strong>📌 Track Bet</strong> to sweat live stats here.</div></div>`;
     return;
   }
   listEl.innerHTML = trackedBets.map(bet => {
@@ -373,6 +430,9 @@ function render() {
 }
 
 async function loadAllData(force = false) {
+  const savedBr = localStorage.getItem(BANKROLL_KEY);
+  if (savedBr && document.getElementById("bankrollInput")) document.getElementById("bankrollInput").value = savedBr;
+
   const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
   document.getElementById("syncText").textContent = "Syncing...";
   document.getElementById("betsCount").textContent = trackedBets.length;
