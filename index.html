@@ -15,7 +15,8 @@
     :root {
       --bg: #07090d; --card: #0e131a; --border: #1c2532; --text: #f8fafc; --sub: #94a3b8; --muted: #64748b;
       --emerald: #10b981; --emerald-dim: rgba(16,185,129,0.16); --orange: #f97316; --orange-dim: rgba(249,115,22,0.16);
-      --cyan: #38bdf8; --cyan-dim: rgba(56,189,248,0.14); --purple: #a855f7; --danger: #ef4444; --danger-dim: rgba(239,68,68,0.16);
+      --cyan: #38bdf8; --cyan-dim: rgba(56,189,248,0.14); --purple: #a855f7; --gold: #eab308; --gold-dim: rgba(234,179,8,0.16);
+      --danger: #ef4444; --danger-dim: rgba(239,68,68,0.16);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.35; padding-bottom: 32px; -webkit-font-smoothing: antialiased; }
@@ -29,8 +30,9 @@
     .sync-sub { font-size: 0.68rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
     .btn-sm { background: var(--card); border: 1px solid var(--border); color: var(--sub); padding: 6px 10px; border-radius: 7px; font-size: 0.74rem; font-weight: 700; cursor: pointer; }
-    .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #0b0e14; padding: 3px; border-radius: 9px; border: 1px solid var(--border); }
-    .tab { border: none; background: transparent; color: var(--sub); padding: 7px 4px; border-radius: 6px; font-size: 0.71rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; }
+    .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #0b0e14; padding: 3px; border-radius: 9px; border: 1px solid var(--border); }
+    .tab { border: none; background: transparent; color: var(--sub); padding: 7px 3px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap; }
+    .tab.active-ev { background: var(--gold); color: #1a1200; }
     .tab.active-nba { background: var(--orange); color: #fff; }
     .tab.active-nbagames { background: var(--purple); color: #fff; }
     .tab.active-ncaa { background: var(--emerald); color: #03150a; }
@@ -57,6 +59,7 @@
     .sharp-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
     .s-tag { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); padding: 1px 6px; border-radius: 4px; font-size: 0.63rem; font-weight: 800; white-space: nowrap; }
     .s-tag.cyan { background: var(--cyan-dim); color: var(--cyan); border-color: rgba(56,189,248,0.3); }
+    .s-tag.gold { background: var(--gold-dim); color: var(--gold); border-color: rgba(234,179,8,0.35); }
     .edge-tag { background: var(--emerald-dim); color: var(--emerald); border: 1px solid rgba(16,185,129,0.35); padding: 2px 6px; border-radius: 5px; font-size: 0.66rem; font-weight: 800; white-space: nowrap; }
     .streak-bar { display: flex; justify-content: space-between; align-items: center; background: #090c11; border: 1px solid var(--border); padding: 5px 8px; border-radius: 7px; font-size: 0.68rem; color: var(--sub); }
     .dots-wrap { display: flex; gap: 3px; align-items: center; }
@@ -74,6 +77,9 @@
     .p-btn.selected { background: var(--emerald-dim); border-color: var(--emerald); }
     .ncaa-scores { display: flex; justify-content: space-between; align-items: center; background: #0a0e14; padding: 6px 9px; border-radius: 7px; font-size: 0.75rem; font-variant-numeric: tabular-nums; gap: 6px; }
     .h2h-bar { font-size: 0.67rem; color: var(--sub); background: #090c11; border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; }
+    .ev-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #090c11; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; text-align: center; font-variant-numeric: tabular-nums; }
+    .ev-m-lbl { font-size: 0.58rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+    .ev-m-val { font-size: 0.78rem; font-weight: 800; margin-top: 1px; }
     .load-more-btn { width: 100%; margin-top: 12px; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 11px; border-radius: 9px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
     .bets-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
     .b-stat { background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; text-align: center; }
@@ -122,7 +128,8 @@
       </div>
     </div>
     <div class="tabs">
-      <button class="tab active-nba" id="tabNba" onclick="switchSport('nba')">🔥 Props (<span id="nbaCount">0</span>)</button>
+      <button class="tab active-ev" id="tabEv" onclick="switchSport('ev')">💎 +EV (<span id="evCount">0</span>)</button>
+      <button class="tab" id="tabNba" onclick="switchSport('nba')">🔥 Props (<span id="nbaCount">0</span>)</button>
       <button class="tab" id="tabNbaGames" onclick="switchSport('nbagames')">🏀 NBA (<span id="nbaGamesCount">0</span>)</button>
       <button class="tab" id="tabNcaa" onclick="switchSport('ncaa')">🏀 NCAA (<span id="ncaaCount">0</span>)</button>
       <button class="tab" id="tabBets" onclick="switchSport('bets')">🎟️ Bets (<span id="betsCount">0</span>)</button>
@@ -138,7 +145,14 @@
         <option value="slip">In My Slip</option>
       </select>
     </div>
-    <div class="chip-strip" id="nbaChips">
+    <div class="chip-strip" id="evChips">
+      <button class="f-chip active" onclick="setEvFilter('ALL', this)">ALL +EV EDGES</button>
+      <button class="f-chip" onclick="setEvFilter('MAX', this)">🔥 15%+ MAX EV</button>
+      <button class="f-chip" onclick="setEvFilter('PROPS', this)">NBA PROPS</button>
+      <button class="f-chip" onclick="setEvFilter('NBAGAMES', this)">NBA GAMES</button>
+      <button class="f-chip" onclick="setEvFilter('NCAA', this)">NCAA GAMES</button>
+    </div>
+    <div class="chip-strip" id="nbaChips" style="display:none;">
       <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PROPS</button>
       <button class="f-chip" onclick="setSubFilter('WATCH', this)">⭐ WATCHLIST</button>
       <button class="f-chip" onclick="setSubFilter('UNDERS', this)">⬇️ UNDERS</button>
@@ -165,7 +179,7 @@
     </div>
     <div class="parlay-banner" id="heroParlay" style="display:none;">
       <div>
-        <div class="parlay-banner-text">🎯 AI Top 4-Leg Edge Parlay</div>
+        <div class="parlay-banner-text">🎯 AI Top 4-Leg +EV Parlay</div>
         <div class="parlay-banner-sub" id="heroParlaySub">Calculating optimal edges...</div>
       </div>
       <button class="btn-quick-parlay" onclick="loadTopParlay()">+ Load 4 Legs</button>
