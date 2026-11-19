@@ -15,7 +15,7 @@
     :root {
       --bg: #07090d; --card: #0e131a; --border: #1c2532; --text: #f8fafc; --sub: #94a3b8; --muted: #64748b;
       --emerald: #10b981; --emerald-dim: rgba(16,185,129,0.16); --orange: #f97316; --orange-dim: rgba(249,115,22,0.16);
-      --cyan: #38bdf8; --cyan-dim: rgba(56,189,248,0.14); --danger: #ef4444; --danger-dim: rgba(239,68,68,0.16);
+      --cyan: #38bdf8; --cyan-dim: rgba(56,189,248,0.14); --purple: #a855f7; --danger: #ef4444; --danger-dim: rgba(239,68,68,0.16);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.35; padding-bottom: 32px; -webkit-font-smoothing: antialiased; }
@@ -29,9 +29,10 @@
     .sync-sub { font-size: 0.68rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
     .btn-sm { background: var(--card); border: 1px solid var(--border); color: var(--sub); padding: 6px 10px; border-radius: 7px; font-size: 0.74rem; font-weight: 700; cursor: pointer; }
-    .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; background: #0b0e14; padding: 3px; border-radius: 9px; border: 1px solid var(--border); }
-    .tab { border: none; background: transparent; color: var(--sub); padding: 7px 6px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+    .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #0b0e14; padding: 3px; border-radius: 9px; border: 1px solid var(--border); }
+    .tab { border: none; background: transparent; color: var(--sub); padding: 7px 4px; border-radius: 6px; font-size: 0.71rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; }
     .tab.active-nba { background: var(--orange); color: #fff; }
+    .tab.active-nbagames { background: var(--purple); color: #fff; }
     .tab.active-ncaa { background: var(--emerald); color: #03150a; }
     .tab.active-bets { background: var(--cyan); color: #03131f; }
     .toolbar { display: flex; gap: 6px; margin: 10px 0 8px; }
@@ -70,6 +71,7 @@
     .p-btn.hot .prob-val, .p-btn.selected .prob-val { color: var(--emerald); }
     .p-btn.selected { background: var(--emerald-dim); border-color: var(--emerald); }
     .ncaa-scores { display: flex; justify-content: space-between; align-items: center; background: #0a0e14; padding: 6px 9px; border-radius: 7px; font-size: 0.75rem; font-variant-numeric: tabular-nums; gap: 6px; }
+    .h2h-bar { font-size: 0.67rem; color: var(--sub); background: #090c11; border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; }
     .load-more-btn { width: 100%; margin-top: 12px; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 11px; border-radius: 9px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
     .bets-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
     .b-stat { background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; text-align: center; }
@@ -118,9 +120,10 @@
       </div>
     </div>
     <div class="tabs">
-      <button class="tab active-nba" id="tabNba" onclick="switchSport('nba')">🔥 NBA (<span id="nbaCount">0</span>)</button>
+      <button class="tab active-nba" id="tabNba" onclick="switchSport('nba')">🔥 Props (<span id="nbaCount">0</span>)</button>
+      <button class="tab" id="tabNbaGames" onclick="switchSport('nbagames')">🏀 NBA (<span id="nbaGamesCount">0</span>)</button>
       <button class="tab" id="tabNcaa" onclick="switchSport('ncaa')">🏀 NCAA (<span id="ncaaCount">0</span>)</button>
-      <button class="tab" id="tabBets" onclick="switchSport('bets')">🎟️ My Bets (<span id="betsCount">0</span>)</button>
+      <button class="tab" id="tabBets" onclick="switchSport('bets')">🎟️ Bets (<span id="betsCount">0</span>)</button>
     </div>
   </header>
 
@@ -142,6 +145,13 @@
       <button class="f-chip" onclick="setSubFilter('REB', this)">REBOUNDS</button>
       <button class="f-chip" onclick="setSubFilter('AST', this)">ASSISTS</button>
       <button class="f-chip" onclick="setSubFilter('PRA', this)">PRA</button>
+    </div>
+    <div class="chip-strip" id="nbaGamesChips" style="display:none;">
+      <button class="f-chip active" onclick="setNbaGamesFilter('ALL', this)">ALL NBA GAMES</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('B2B', this)">😴 B2B FATIGUE</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('MOVES', this)">📉 LINE MOVES</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('TOTALS', this)">🎯 BEST TOTALS</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('SPREADS', this)">📊 BEST SPREADS</button>
     </div>
     <div class="chip-strip" id="ncaaChips" style="display:none;">
       <button class="f-chip active" onclick="setNcaaFilter('ALL', this)">ALL GAMES</button>
