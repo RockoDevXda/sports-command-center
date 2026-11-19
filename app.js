@@ -5,6 +5,19 @@ const NBA_GAMES_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/nba
 const STORAGE_KEY = "simlab_tracked_bets_v1";
 const WATCH_KEY = "simlab_watchlist_v1";
 const BANKROLL_KEY = "simlab_bankroll_v1";
+const BOOK_KEY = "simlab_preferred_book_v1";
+
+const SPORTSBOOKS = {
+  pp: { name: "PrizePicks", url: "https://app.prizepicks.com/", mode: "pickem" },
+  ud: { name: "Underdog", url: "https://underdogfantasy.com/pick-em", mode: "pickem" },
+  dk: { name: "DraftKings", url: "https://sportsbook.draftkings.com/", mode: "book" },
+  pk6: { name: "DK Pick6", url: "https://pick6.draftkings.com/", mode: "pickem" },
+  fd: { name: "FanDuel", url: "https://sportsbook.fanduel.com/", mode: "book" },
+  hr: { name: "Hard Rock Bet", url: "https://app.hardrock.bet/", mode: "book" },
+  mgm: { name: "BetMGM", url: "https://sports.betmgm.com/", mode: "book" },
+  sl: { name: "Sleeper", url: "https://sleeper.com/picks", mode: "pickem" },
+  betr: { name: "Betr Picks", url: "https://betr.app/", mode: "pickem" }
+};
 
 let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
 let ncaaGames = [], nbaGames = [], nbaPlayers = [], evBoard = [], topParlayLegs = [], slip = [], pickRegistry = {};
@@ -69,11 +82,65 @@ function saveBankrollAndCalc() {
   if (activeSport === "ev") render();
 }
 
+function savePreferredBook() {
+  const bk = document.getElementById("sportsbookSelect").value;
+  try { localStorage.setItem(BOOK_KEY, bk); } catch (e) {}
+}
+
 function applyKellyStake() {
   if (lastKellyDollar > 0) {
     document.getElementById("stakeInput").value = lastKellyDollar;
     updateSlipUI(false);
   }
+}
+
+function formatSlipForPlatform(mode) {
+  const oddsVal = document.getElementById("bookOddsInput").value;
+  const stakeVal = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
+  const payoutVal = +(stakeVal * americanToDecimal(oddsVal)).toFixed(2);
+  let comb = 1.0;
+  slip.forEach(s => { comb *= (s.prob / 100); });
+  const pct = +(comb * 100).toFixed(1);
+
+  const lines = slip.map((s, i) => {
+    let lbl = s.label;
+    if (mode === "pickem") {
+      lbl = lbl.replace(/\bO\s+(\d+(\.\d+)?)/g, "MORE $1").replace(/\bU\s+(\d+(\.\d+)?)/g, "LESS $1");
+    }
+    return `${i + 1}. ${lbl} (${s.prob}%)`;
+  });
+
+  return [
+    `🎯 SimLab ${slip.length}-Leg Card (${pct}% Hit | Odds ${oddsVal} | $${stakeVal} → $${payoutVal}):`,
+    ...lines
+  ].join("\n");
+}
+
+function copySlipText() {
+  if (!slip.length) return;
+  const text = formatSlipForPlatform("book");
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      const b = document.getElementById("copySlipBtn");
+      b.textContent = "✓";
+      setTimeout(() => { b.textContent = "📋"; }, 1600);
+    });
+  }
+}
+
+async function openSportsbookWithSlip() {
+  if (!slip.length) return;
+  const bkKey = document.getElementById("sportsbookSelect").value || "pp";
+  const book = SPORTSBOOKS[bkKey] || SPORTSBOOKS.pp;
+  const text = formatSlipForPlatform(book.mode);
+
+  if (navigator.clipboard) {
+    try { await navigator.clipboard.writeText(text); } catch (e) {}
+  }
+  const btn = document.getElementById("openBookBtn");
+  btn.textContent = `✓ Copied! Opening ${book.name}...`;
+  setTimeout(() => { btn.textContent = "🚀 Copy & Open App"; }, 2200);
+  window.open(book.url, "_blank", "noopener");
 }
 
 function switchSport(sport) {
@@ -125,20 +192,6 @@ function toggleSlipByKey(key) {
 }
 function clearSlip() { slip = []; updateSlipUI(true); render(); }
 function loadTopParlay() { if (!topParlayLegs.length) return; slip = topParlayLegs.map(x => ({ ...x })); updateSlipUI(true); render(); }
-
-function copySlipText() {
-  if (!slip.length) return;
-  let comb = 1.0;
-  slip.forEach(s => { comb *= (s.prob / 100); });
-  const pct = +(comb * 100).toFixed(1);
-  const oddsVal = document.getElementById("bookOddsInput").value;
-  const stakeVal = document.getElementById("stakeInput").value;
-  const lines = [
-    `🎯 SimLab ${slip.length}-Leg Slip (${pct}% Hit | Odds ${oddsVal} | Stake $${stakeVal}):`,
-    ...slip.map((s, i) => `${i + 1}. ${s.label} (${s.prob}%)`)
-  ].join("\n");
-  if (navigator.clipboard) navigator.clipboard.writeText(lines).then(() => { const b = document.getElementById("copySlipBtn"); b.textContent = "✓"; setTimeout(() => { b.textContent = "📋"; }, 1600); });
-}
 
 function updateSlipUI(recalcDefaultOdds = true) {
   const has = slip.length > 0;
@@ -227,17 +280,10 @@ function buildEvBoard() {
         };
         registerPick(k, `${p.player} ${m.market}`, m.prob, meta);
         items.push({
-          key: k,
-          category: "PROPS",
-          badge: "🔥 NBA PROP",
+          key: k, category: "PROPS", badge: "🔥 NBA PROP",
           title: `${p.player} ${m.market}`,
           subtitle: `${p.team} vs ${p.opponent} • Sim: ${m.proj} • L10: ${m.hit_str || "N/A"}`,
-          tags: p.tags || [],
-          prob: m.prob,
-          evPct,
-          qKellyPct,
-          dots: m.dots || "",
-          gameId: p.game_id
+          tags: p.tags || [], prob: m.prob, evPct, qKellyPct, dots: m.dots || "", gameId: p.game_id
         });
       }
     }
@@ -253,17 +299,10 @@ function buildEvBoard() {
         const meta = { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
         registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
         items.push({
-          key: k,
-          category: "NBAGAMES",
-          badge: "🏀 NBA SPREAD",
+          key: k, category: "NBAGAMES", badge: "🏀 NBA SPREAD",
           title: g.spread_pick,
           subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
-          tags: g.move_badges || [],
-          prob: g.spread_cover_pct,
-          evPct,
-          qKellyPct,
-          dots: "",
-          gameId: g.id
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
         });
       }
     }
@@ -274,17 +313,10 @@ function buildEvBoard() {
         const meta = { sport: "nbagame", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
         registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
         items.push({
-          key: k,
-          category: "NBAGAMES",
-          badge: "🏀 NBA TOTAL",
+          key: k, category: "NBAGAMES", badge: "🏀 NBA TOTAL",
           title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
           subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
-          tags: g.move_badges || [],
-          prob: g.total_cover_pct,
-          evPct,
-          qKellyPct,
-          dots: "",
-          gameId: g.id
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
         });
       }
     }
@@ -301,17 +333,10 @@ function buildEvBoard() {
         const meta = { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
         registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
         items.push({
-          key: k,
-          category: "NCAA",
-          badge: "🏀 NCAA ATS",
+          key: k, category: "NCAA", badge: "🏀 NCAA ATS",
           title: g.spread_pick,
           subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
-          tags: g.move_badges || [],
-          prob: g.spread_cover_pct,
-          evPct,
-          qKellyPct,
-          dots: "",
-          gameId: g.id
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
         });
       }
     }
@@ -322,17 +347,10 @@ function buildEvBoard() {
         const meta = { sport: "ncaa", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
         registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
         items.push({
-          key: k,
-          category: "NCAA",
-          badge: "🏀 NCAA TOTAL",
+          key: k, category: "NCAA", badge: "🏀 NCAA TOTAL",
           title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
           subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
-          tags: g.move_badges || [],
-          prob: g.total_cover_pct,
-          evPct,
-          qKellyPct,
-          dots: "",
-          gameId: g.id
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
         });
       }
     }
@@ -482,7 +500,19 @@ function renderBetsTab() {
       const showBar = leg.meta?.sport === "nba" || leg.meta?.betType === "total";
       return `<div class="leg-row"><div class="leg-top"><span>${icon} ${escHtml(leg.label)}</span><span style="color:var(--emerald); font-size:0.7rem;">${leg.prob}%</span></div><div class="leg-sub"><span>${escHtml(leg.liveScore)}</span><span>${escHtml(leg.clock || "")}</span></div>${showBar ? `<div class="prog-track"><div class="prog-fill ${leg.status}" style="width:${pct}%"></div></div>` : ""}</div>`;
     }).join("");
-    return `<article class="bet-card ${bet.status}"><div class="c-head"><div><div class="c-name">${bet.legs.length}-Leg ${bet.legs.length === 1 ? "Straight" : "Parlay"} • $${bet.stake} → $${bet.payout}</div><div class="c-meta">Placed ${escHtml(bet.createdAt)}</div></div><div style="display:flex; align-items:center; gap:6px;">${badgeMap[bet.status] || badgeMap.pending}<button class="btn-sm" style="padding:2px 6px; font-size:0.68rem;" data-id="${escHtml(bet.id)}" onclick="deleteTrackedBet(this.dataset.id)">🗑️</button></div></div>${legsHtml}</article>`;
+    return `<article class="bet-card ${bet.status}">
+      <div class="c-head">
+        <div>
+          <div class="c-name">${bet.legs.length}-Leg ${bet.legs.length === 1 ? "Straight" : "Parlay"} • $${bet.stake} → $${bet.payout}</div>
+          <div class="c-meta">Placed ${escHtml(bet.createdAt)}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          ${badgeMap[bet.status] || badgeMap.pending}
+          <button class="btn-sm" style="padding:2px 6px; font-size:0.68rem;" data-id="${escHtml(bet.id)}" onclick="deleteTrackedBet(this.dataset.id)">🗑️</button>
+        </div>
+      </div>
+      ${legsHtml}
+    </article>`;
   }).join("");
 }
 
@@ -679,6 +709,9 @@ function render() {
 async function loadAllData(force = false) {
   const savedBr = localStorage.getItem(BANKROLL_KEY);
   if (savedBr && document.getElementById("bankrollInput")) document.getElementById("bankrollInput").value = savedBr;
+
+  const savedBk = localStorage.getItem(BOOK_KEY);
+  if (savedBk && document.getElementById("sportsbookSelect")) document.getElementById("sportsbookSelect").value = savedBk;
 
   const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
   document.getElementById("syncText").textContent = "Syncing...";
