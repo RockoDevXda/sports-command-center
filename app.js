@@ -22,6 +22,8 @@ const SPORTSBOOKS = {
 let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
 let ncaaGames = [], nbaGames = [], nbaPlayers = [], evBoard = [], topParlayLegs = [], slip = [], pickRegistry = {};
 let activePropByPlayer = {};
+let openHedgeMap = {};
+let hedgeOddsMap = {};
 let watchlist = loadJson(WATCH_KEY, []);
 let trackedBets = loadJson(STORAGE_KEY, []);
 let lastKellyDollar = 0;
@@ -92,6 +94,36 @@ function applyKellyStake() {
     document.getElementById("stakeInput").value = lastKellyDollar;
     updateSlipUI(false);
   }
+}
+
+function toggleHedgeDrawer(betId) {
+  openHedgeMap[betId] = !openHedgeMap[betId];
+  if (!hedgeOddsMap[betId]) hedgeOddsMap[betId] = "+140";
+  renderBetsTab();
+}
+
+function updateHedgeCalc(betId, rawOdds) {
+  hedgeOddsMap[betId] = rawOdds;
+  const bet = trackedBets.find(b => b.id === betId);
+  if (!bet) return;
+  const metrics = computeHedgeNumbers(bet.stake, bet.payout, rawOdds);
+  const stakeEl = document.getElementById(`h-stake-${betId}`);
+  const profEl = document.getElementById(`h-prof-${betId}`);
+  const freeEl = document.getElementById(`h-free-${betId}`);
+  if (stakeEl) stakeEl.textContent = `$${metrics.equalHedgeStake.toFixed(2)}`;
+  if (profEl) {
+    profEl.textContent = `${metrics.lockedProfit >= 0 ? "+" : "-"}$${Math.abs(metrics.lockedProfit).toFixed(2)}`;
+    profEl.style.color = metrics.lockedProfit >= 0 ? "var(--emerald)" : "var(--danger)";
+  }
+  if (freeEl) freeEl.textContent = `$${metrics.freerollStake.toFixed(2)}`;
+}
+
+function computeHedgeNumbers(origStake, origPayout, hedgeAmerican) {
+  const dec = americanToDecimal(hedgeAmerican);
+  const equalHedgeStake = dec > 0 ? (origPayout / dec) : 0;
+  const lockedProfit = origPayout - origStake - equalHedgeStake;
+  const freerollStake = dec > 1 ? (origStake / (dec - 1)) : 0;
+  return { equalHedgeStake, lockedProfit, freerollStake };
 }
 
 function formatSlipForPlatform(mode) {
@@ -556,12 +588,40 @@ function renderBetsTab() {
   }
   listEl.innerHTML = trackedBets.map(bet => {
     const badgeMap = { won: `<span class="status-pill won">🏆 WON +$${(bet.payout - bet.stake).toFixed(0)}</span>`, lost: `<span class="status-pill lost">❌ LOST -$${bet.stake}</span>`, live: `<span class="status-pill live">⚡ LIVE SWEAT</span>`, pending: `<span class="status-pill pending">⏳ UPCOMING</span>` };
+    const isOpen = Boolean(openHedgeMap[bet.id]);
+    const hOdds = hedgeOddsMap[bet.id] || "+140";
+    const hm = computeHedgeNumbers(bet.stake, bet.payout, hOdds);
+    const canHedge = bet.status === "live" || bet.status === "pending";
+
     const legsHtml = bet.legs.map(leg => {
       const icon = leg.status === "hit" ? "✅" : (leg.status === "miss" ? "❌" : (leg.status === "live" ? "⚡" : "⏳"));
       const pct = leg.targetVal > 0 ? Math.min(100, Math.round((leg.currentVal / leg.targetVal) * 100)) : 0;
       const showBar = leg.meta?.sport === "nba" || leg.meta?.betType === "total";
       return `<div class="leg-row"><div class="leg-top"><span>${icon} ${escHtml(leg.label)}</span><span style="color:var(--emerald); font-size:0.7rem;">${leg.prob}%</span></div><div class="leg-sub"><span>${escHtml(leg.liveScore)}</span><span>${escHtml(leg.clock || "")}</span></div>${showBar ? `<div class="prog-track"><div class="prog-fill ${leg.status}" style="width:${pct}%"></div></div>` : ""}</div>`;
     }).join("");
+
+    const hedgeHtml = (canHedge && isOpen) ? `
+      <div class="hedge-drawer">
+        <div class="hedge-head">
+          <span>🛡️ Live Hedge & Cashout Calculator</span>
+          <span class="stake-box" style="color:var(--gold);">Opp Odds<input type="text" value="${escHtml(hOdds)}" data-id="${escHtml(bet.id)}" oninput="updateHedgeCalc(this.dataset.id, this.value)" /></span>
+        </div>
+        <div class="hedge-grid">
+          <div>
+            <div class="ev-m-lbl">Equal Hedge</div>
+            <div class="ev-m-val" id="h-stake-${escHtml(bet.id)}" style="color:#fff;">$${hm.equalHedgeStake.toFixed(2)}</div>
+          </div>
+          <div>
+            <div class="ev-m-lbl">Locked Profit</div>
+            <div class="ev-m-val" id="h-prof-${escHtml(bet.id)}" style="color:${hm.lockedProfit >= 0 ? "var(--emerald)" : "var(--danger)"};">${hm.lockedProfit >= 0 ? "+" : "-"}$${Math.abs(hm.lockedProfit).toFixed(2)}</div>
+          </div>
+          <div>
+            <div class="ev-m-lbl">Risk-Free Stake</div>
+            <div class="ev-m-val" id="h-free-${escHtml(bet.id)}" style="color:var(--cyan);">$${hm.freerollStake.toFixed(2)}</div>
+          </div>
+        </div>
+      </div>` : "";
+
     return `<article class="bet-card ${bet.status}">
       <div class="c-head">
         <div>
@@ -570,11 +630,13 @@ function renderBetsTab() {
         </div>
         <div style="display:flex; align-items:center; gap:5px;">
           ${badgeMap[bet.status] || badgeMap.pending}
+          ${canHedge ? `<button class="btn-sm" style="padding:2px 6px; font-size:0.68rem; border-color:var(--gold); color:var(--gold);" data-id="${escHtml(bet.id)}" onclick="toggleHedgeDrawer(this.dataset.id)">🛡️ Hedge</button>` : ""}
           <button class="btn-sm" style="padding:2px 6px; font-size:0.68rem; border-color:var(--cyan); color:var(--cyan);" data-id="${escHtml(bet.id)}" onclick="shareSavedBet(this.dataset.id)">📤</button>
           <button class="btn-sm" style="padding:2px 6px; font-size:0.68rem;" data-id="${escHtml(bet.id)}" onclick="deleteTrackedBet(this.dataset.id)">🗑️</button>
         </div>
       </div>
       ${legsHtml}
+      ${hedgeHtml}
     </article>`;
   }).join("");
 }
