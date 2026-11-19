@@ -110,4 +110,147 @@
     .kelly-pill.no-edge { background: var(--danger-dim); color: var(--danger); border-color: rgba(239,68,68,0.35); }
     .slip-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
     .slip-chips::-webkit-scrollbar { display: none; }
-    .s-chip { background:
+    .s-chip { background: #18212e; border: 1px solid var(--border); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+    .s-chip span { color: var(--danger); font-weight: 900; cursor: pointer; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top-row">
+      <div class="brand">
+        <img src="./icon-512.jpeg" alt="SimLab" onerror="this.style.display='none'" />
+        <div>
+          <div class="brand-title">SimLab Command Center</div>
+          <div class="sync-sub"><span class="dot"></span><span id="syncText">Syncing live slates...</span></div>
+        </div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button id="installBtn" class="btn-sm" style="display:none; border-color:var(--emerald); color:var(--emerald);">📲 Install</button>
+        <button class="btn-sm" onclick="handleManualRefresh()">↻ Sync</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active-ev" id="tabEv" onclick="switchSport('ev')">💎 +EV (<span id="evCount">0</span>)</button>
+      <button class="tab" id="tabNba" onclick="switchSport('nba')">🔥 Props (<span id="nbaCount">0</span>)</button>
+      <button class="tab" id="tabNbaGames" onclick="switchSport('nbagames')">🏀 NBA (<span id="nbaGamesCount">0</span>)</button>
+      <button class="tab" id="tabNcaa" onclick="switchSport('ncaa')">🏀 NCAA (<span id="ncaaCount">0</span>)</button>
+      <button class="tab" id="tabBets" onclick="switchSport('bets')">🎟️ Bets (<span id="betsCount">0</span>)</button>
+    </div>
+  </header>
+
+  <div id="marketControls">
+    <div class="toolbar">
+      <input type="text" id="searchInput" class="search-in" placeholder="Search player or team..." oninput="resetAndRender()" />
+      <select id="filterSelect" class="filter-sel" onchange="resetAndRender()">
+        <option value="all">All Matchups</option>
+        <option value="edge">Top Edges Only</option>
+        <option value="slip">In My Slip</option>
+      </select>
+    </div>
+    <div class="chip-strip" id="evChips">
+      <button class="f-chip active" onclick="setEvFilter('ALL', this)">ALL +EV EDGES</button>
+      <button class="f-chip" onclick="setEvFilter('MAX', this)">🔥 15%+ MAX EV</button>
+      <button class="f-chip" onclick="setEvFilter('PROPS', this)">NBA PROPS</button>
+      <button class="f-chip" onclick="setEvFilter('NBAGAMES', this)">NBA GAMES</button>
+      <button class="f-chip" onclick="setEvFilter('NCAA', this)">NCAA GAMES</button>
+    </div>
+    <div class="chip-strip" id="nbaChips" style="display:none;">
+      <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PROPS</button>
+      <button class="f-chip" onclick="setSubFilter('WATCH', this)">⭐ WATCHLIST</button>
+      <button class="f-chip" onclick="setSubFilter('UNDERS', this)">⬇️ UNDERS</button>
+      <button class="f-chip" onclick="setSubFilter('ALTS', this)">🪜 ALT LADDERS</button>
+      <button class="f-chip" onclick="setSubFilter('HOT', this)">🔥 8/10 STREAKS</button>
+      <button class="f-chip" onclick="setSubFilter('USG', this)">⚡ USAGE BUMPS</button>
+      <button class="f-chip" onclick="setSubFilter('PTS', this)">POINTS</button>
+      <button class="f-chip" onclick="setSubFilter('REB', this)">REBOUNDS</button>
+      <button class="f-chip" onclick="setSubFilter('AST', this)">ASSISTS</button>
+      <button class="f-chip" onclick="setSubFilter('PRA', this)">PRA</button>
+    </div>
+    <div class="chip-strip" id="nbaGamesChips" style="display:none;">
+      <button class="f-chip active" onclick="setNbaGamesFilter('ALL', this)">ALL NBA GAMES</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('B2B', this)">😴 B2B FATIGUE</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('MOVES', this)">📉 LINE MOVES</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('TOTALS', this)">🎯 BEST TOTALS</button>
+      <button class="f-chip" onclick="setNbaGamesFilter('SPREADS', this)">📊 BEST SPREADS</button>
+    </div>
+    <div class="chip-strip" id="ncaaChips" style="display:none;">
+      <button class="f-chip active" onclick="setNcaaFilter('ALL', this)">ALL GAMES</button>
+      <button class="f-chip" onclick="setNcaaFilter('MOVES', this)">📉 LINE MOVES</button>
+      <button class="f-chip" onclick="setNcaaFilter('TOTALS', this)">🎯 BEST TOTALS</button>
+      <button class="f-chip" onclick="setNcaaFilter('SPREADS', this)">📊 BEST SPREADS</button>
+    </div>
+    <div class="parlay-banner" id="heroParlay" style="display:none;">
+      <div>
+        <div class="parlay-banner-text">🎯 AI Top 4-Leg +EV Parlay</div>
+        <div class="parlay-banner-sub" id="heroParlaySub">Calculating optimal edges...</div>
+      </div>
+      <button class="btn-quick-parlay" onclick="loadTopParlay()">+ Load 4 Legs</button>
+    </div>
+  </div>
+
+  <div id="betsControls" style="display:none;">
+    <div class="bets-summary">
+      <div class="b-stat"><div class="b-stat-lbl">Active Risk</div><div class="b-stat-val" id="statActiveRisk" style="color:var(--cyan);">$0</div></div>
+      <div class="b-stat"><div class="b-stat-lbl">Net P/L</div><div class="b-stat-val" id="statNetPL">$0</div></div>
+      <div class="b-stat"><div class="b-stat-lbl">Record</div><div class="b-stat-val" id="statRecord">0-0</div></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-size:0.7rem; color:var(--muted);" id="livePollStatus">Live ESPN auto-tracker active (45s)</span>
+      <button class="btn-sm" style="padding:4px 9px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="refreshTrackedBets()">⚡ Update Live Scores</button>
+    </div>
+  </div>
+
+  <main class="list" id="cardsList"></main>
+  <button class="load-more-btn" id="loadMoreBtn" style="display:none;" onclick="showMore()">Show More Results</button>
+</div>
+
+<div class="slip-bar" id="slipBar">
+  <div class="slip-top">
+    <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+      <span style="font-size:0.74rem; font-weight:800; color:var(--emerald);">🎯 SLIP (<span id="slipCount">0</span>)</span>
+      <span class="stake-box" title="Sportsbook Odds">Odds<input type="number" id="bookOddsInput" value="-110" oninput="updateSlipUI(false)" /></span>
+      <span class="stake-box" title="Wager Stake">$<input type="number" id="stakeInput" value="25" min="1" oninput="updateSlipUI(false)" /></span>
+      <span style="font-size:0.73rem; font-weight:800; color:var(--cyan);" id="slipPayout">→ $48</span>
+    </div>
+    <div style="display:flex; gap:5px;">
+      <button class="btn-quick-parlay" style="padding:4px 8px; font-size:0.7rem;" onclick="saveTrackedBet()">📌 Track</button>
+      <button id="shareSlipBtn" class="btn-sm" style="padding:3px 8px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="shareCurrentSlip()">📤 Share</button>
+      <button class="btn-sm" style="padding:3px 7px; font-size:0.7rem;" onclick="clearSlip()">×</button>
+    </div>
+  </div>
+  <div class="kelly-row">
+    <div style="display:flex; align-items:center; gap:5px;">
+      <span style="color:var(--sub); font-weight:700;">Bankroll</span>
+      <span class="stake-box">$<input type="number" id="bankrollInput" value="500" min="10" oninput="saveBankrollAndCalc()" /></span>
+      <select id="kellyFracSelect" style="background:#0a0e14; border:1px solid var(--border); color:#fff; border-radius:5px; padding:2px 4px; font-size:0.68rem; font-weight:700;" onchange="updateSlipUI(false)">
+        <option value="0.25" selected>1/4 Kelly</option>
+        <option value="0.5">1/2 Kelly</option>
+        <option value="1.0">Full Kelly</option>
+      </select>
+    </div>
+    <button id="kellyApplyBtn" class="kelly-pill" onclick="applyKellyStake()">⚡ Kelly: $0 (0%)</button>
+  </div>
+  <div class="book-row">
+    <div style="display:flex; align-items:center; gap:5px;">
+      <span style="color:var(--sub); font-weight:700;">Platform</span>
+      <select id="sportsbookSelect" class="book-sel" onchange="savePreferredBook()">
+        <option value="pp">PrizePicks (Pick'em)</option>
+        <option value="ud">Underdog (Pick'em)</option>
+        <option value="dk">DraftKings Sportsbook</option>
+        <option value="pk6">DraftKings Pick6</option>
+        <option value="fd">FanDuel Sportsbook</option>
+        <option value="hr">Hard Rock Bet</option>
+        <option value="mgm">BetMGM</option>
+        <option value="sl">Sleeper Picks</option>
+        <option value="betr">Betr Picks</option>
+      </select>
+    </div>
+    <button id="openBookBtn" class="btn-book" onclick="openSportsbookWithSlip()">🚀 Copy & Open App</button>
+  </div>
+  <div class="slip-chips" id="slipChips"></div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
