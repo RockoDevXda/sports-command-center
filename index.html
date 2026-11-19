@@ -19,7 +19,7 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.35; padding-bottom: 32px; -webkit-font-smoothing: antialiased; }
-    body.has-slip { padding-bottom: 145px; }
+    body.has-slip { padding-bottom: 175px; }
     .wrap { max-width: 1120px; margin: 0 auto; padding: 0 12px; }
     header { padding: 12px 0 10px; border-bottom: 1px solid var(--border); }
     .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -87,11 +87,14 @@
     .prog-fill { height: 100%; background: var(--cyan); border-radius: 999px; transition: width 0.3s ease; }
     .prog-fill.hit { background: var(--emerald); }
     .prog-fill.miss { background: var(--danger); }
-    .slip-bar { position: fixed; bottom: 10px; left: 10px; right: 10px; max-width: 1096px; margin: 0 auto; background: rgba(13,18,26,0.98); border: 1px solid var(--emerald); border-radius: 12px; padding: 10px 12px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(12px); display: none; flex-direction: column; gap: 8px; }
+    .slip-bar { position: fixed; bottom: 10px; left: 10px; right: 10px; max-width: 1096px; margin: 0 auto; background: rgba(13,18,26,0.98); border: 1px solid var(--emerald); border-radius: 12px; padding: 10px 12px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(12px); display: none; flex-direction: column; gap: 7px; }
     body.has-slip .slip-bar { display: flex; }
-    .slip-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .stake-box { display: inline-flex; align-items: center; background: #0a0e14; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; font-weight: 700; color: var(--emerald); }
-    .stake-box input { width: 44px; background: transparent; border: none; color: #fff; font-size: 0.74rem; font-weight: 800; outline: none; text-align: right; }
+    .slip-top, .kelly-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .kelly-row { background: #090c11; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 0.69rem; }
+    .stake-box { display: inline-flex; align-items: center; background: #0a0e14; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 0.7rem; font-weight: 700; color: var(--emerald); gap: 2px; }
+    .stake-box input { width: 46px; background: transparent; border: none; color: #fff; font-size: 0.72rem; font-weight: 800; outline: none; text-align: right; }
+    .kelly-pill { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35); padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.69rem; cursor: pointer; }
+    .kelly-pill.no-edge { background: var(--danger-dim); color: var(--danger); border-color: rgba(239,68,68,0.35); }
     .slip-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
     .slip-chips::-webkit-scrollbar { display: none; }
     .s-chip { background: #18212e; border: 1px solid var(--border); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
@@ -173,16 +176,29 @@
 
 <div class="slip-bar" id="slipBar">
   <div class="slip-top">
-    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-      <span style="font-size:0.75rem; font-weight:800; color:var(--emerald);">🎯 SLIP (<span id="slipCount">0</span>)</span>
-      <span class="stake-box">$<input type="number" id="stakeInput" value="25" min="1" oninput="updateSlipUI()" /></span>
-      <span style="font-size:0.74rem; font-weight:800; color:var(--cyan);" id="slipPayout">→ $48</span>
+    <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+      <span style="font-size:0.74rem; font-weight:800; color:var(--emerald);">🎯 SLIP (<span id="slipCount">0</span>)</span>
+      <span class="stake-box" title="Sportsbook Odds">Odds<input type="number" id="bookOddsInput" value="-110" oninput="updateSlipUI(false)" /></span>
+      <span class="stake-box" title="Wager Stake">$<input type="number" id="stakeInput" value="25" min="1" oninput="updateSlipUI(false)" /></span>
+      <span style="font-size:0.73rem; font-weight:800; color:var(--cyan);" id="slipPayout">→ $48</span>
     </div>
     <div style="display:flex; gap:5px;">
       <button class="btn-quick-parlay" style="padding:4px 9px; font-size:0.7rem;" onclick="saveTrackedBet()">📌 Track Bet</button>
       <button id="copySlipBtn" class="btn-sm" style="padding:3px 7px; font-size:0.7rem;" onclick="copySlipText()">📋</button>
       <button class="btn-sm" style="padding:3px 7px; font-size:0.7rem;" onclick="clearSlip()">×</button>
     </div>
+  </div>
+  <div class="kelly-row">
+    <div style="display:flex; align-items:center; gap:5px;">
+      <span style="color:var(--sub); font-weight:700;">Bankroll</span>
+      <span class="stake-box">$<input type="number" id="bankrollInput" value="500" min="10" oninput="saveBankrollAndCalc()" /></span>
+      <select id="kellyFracSelect" style="background:#0a0e14; border:1px solid var(--border); color:#fff; border-radius:5px; padding:2px 4px; font-size:0.68rem; font-weight:700;" onchange="updateSlipUI(false)">
+        <option value="0.25" selected>1/4 Kelly</option>
+        <option value="0.5">1/2 Kelly</option>
+        <option value="1.0">Full Kelly</option>
+      </select>
+    </div>
+    <button id="kellyApplyBtn" class="kelly-pill" onclick="applyKellyStake()">⚡ Kelly: $0 (0%)</button>
   </div>
   <div class="slip-chips" id="slipChips"></div>
 </div>
