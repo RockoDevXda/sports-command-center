@@ -6,8 +6,8 @@ const STORAGE_KEY = "simlab_tracked_bets_v1";
 const WATCH_KEY = "simlab_watchlist_v1";
 const BANKROLL_KEY = "simlab_bankroll_v1";
 
-let activeSport = "nba", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
-let ncaaGames = [], nbaGames = [], nbaPlayers = [], topParlayLegs = [], slip = [], pickRegistry = {};
+let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", visibleLimit = 25;
+let ncaaGames = [], nbaGames = [], nbaPlayers = [], evBoard = [], topParlayLegs = [], slip = [], pickRegistry = {};
 let activePropByPlayer = {};
 let watchlist = loadJson(WATCH_KEY, []);
 let trackedBets = loadJson(STORAGE_KEY, []);
@@ -52,11 +52,21 @@ function americanToDecimal(am) {
   if (isNaN(n) || n === 0 || (n > -100 && n < 100)) return 1.909;
   return n > 0 ? 1 + (n / 100) : 1 + (100 / Math.abs(n));
 }
+function calcEvAndQuarterKelly(probPct, decOdds = 1.909) {
+  const p = probPct / 100.0;
+  const q = 1.0 - p;
+  const b = decOdds - 1.0;
+  const evPct = +((p * b - q) * 100).toFixed(1);
+  const rawKelly = b > 0 ? Math.max(0, (b * p - q) / b) : 0;
+  const qKellyPct = +(rawKelly * 0.25 * 100).toFixed(1);
+  return { evPct, qKellyPct };
+}
 
 function saveBankrollAndCalc() {
   const br = Math.max(1, parseFloat(document.getElementById("bankrollInput").value) || 500);
   try { localStorage.setItem(BANKROLL_KEY, String(br)); } catch (e) {}
   updateSlipUI(false);
+  if (activeSport === "ev") render();
 }
 
 function applyKellyStake() {
@@ -69,6 +79,7 @@ function applyKellyStake() {
 function switchSport(sport) {
   activeSport = sport;
   visibleLimit = 25;
+  document.getElementById("tabEv").className = sport === "ev" ? "tab active-ev" : "tab";
   document.getElementById("tabNba").className = sport === "nba" ? "tab active-nba" : "tab";
   document.getElementById("tabNbaGames").className = sport === "nbagames" ? "tab active-nbagames" : "tab";
   document.getElementById("tabNcaa").className = sport === "ncaa" ? "tab active-ncaa" : "tab";
@@ -76,6 +87,7 @@ function switchSport(sport) {
 
   document.getElementById("marketControls").style.display = sport === "bets" ? "none" : "block";
   document.getElementById("betsControls").style.display = sport === "bets" ? "block" : "none";
+  document.getElementById("evChips").style.display = sport === "ev" ? "flex" : "none";
   document.getElementById("nbaChips").style.display = sport === "nba" ? "flex" : "none";
   document.getElementById("nbaGamesChips").style.display = sport === "nbagames" ? "flex" : "none";
   document.getElementById("ncaaChips").style.display = sport === "ncaa" ? "flex" : "none";
@@ -92,6 +104,7 @@ function startLivePoller() {
 }
 function stopLivePoller() { if (livePollTimer) { clearInterval(livePollTimer); livePollTimer = null; } }
 function handleManualRefresh() { if (activeSport === "bets") refreshTrackedBets(); else loadAllData(true); }
+function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setSubFilter(val, btn) { subFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNbaGamesFilter(val, btn) { nbaGamesFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaGamesChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNcaaFilter(val, btn) { ncaaFilter = val; visibleLimit = 25; document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
@@ -198,38 +211,146 @@ function deleteTrackedBet(betId) {
   renderBetsTab();
 }
 
+function buildEvBoard() {
+  const items = [];
+
+  for (const p of nbaPlayers) {
+    const pidStr = String(p.id);
+    for (const m of (p.all_props || [])) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(m.prob, 1.909);
+      if (evPct >= 3.0) {
+        const side = m.side || "O";
+        const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
+        const meta = {
+          sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+          stat: m.stat, side, line: m.line, isAlt: false, fairOdds: m.fair_odds, marketKey: m.market
+        };
+        registerPick(k, `${p.player} ${m.market}`, m.prob, meta);
+        items.push({
+          key: k,
+          category: "PROPS",
+          badge: "🔥 NBA PROP",
+          title: `${p.player} ${m.market}`,
+          subtitle: `${p.team} vs ${p.opponent} • Sim: ${m.proj} • L10: ${m.hit_str || "N/A"}`,
+          tags: p.tags || [],
+          prob: m.prob,
+          evPct,
+          qKellyPct,
+          dots: m.dots || "",
+          gameId: p.game_id
+        });
+      }
+    }
+  }
+
+  for (const g of nbaGames) {
+    const awayLbl = g.away_abbr || g.away_short;
+    const homeLbl = g.home_abbr || g.home_short;
+    if (g.has_line) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `nbagame-${g.id}-ats`;
+        const meta = { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
+        items.push({
+          key: k,
+          category: "NBAGAMES",
+          badge: "🏀 NBA SPREAD",
+          title: g.spread_pick,
+          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
+          tags: g.move_badges || [],
+          prob: g.spread_cover_pct,
+          evPct,
+          qKellyPct,
+          dots: "",
+          gameId: g.id
+        });
+      }
+    }
+    if (g.has_total) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `nbagame-${g.id}-tot`;
+        const meta = { sport: "nbagame", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
+        items.push({
+          key: k,
+          category: "NBAGAMES",
+          badge: "🏀 NBA TOTAL",
+          title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
+          subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
+          tags: g.move_badges || [],
+          prob: g.total_cover_pct,
+          evPct,
+          qKellyPct,
+          dots: "",
+          gameId: g.id
+        });
+      }
+    }
+  }
+
+  for (const g of ncaaGames) {
+    if (g.verified_d1 === false) continue;
+    const awayLbl = g.away_short || g.away_team;
+    const homeLbl = g.home_short || g.home_team;
+    if (g.has_line && Math.abs(g.home_spread || 0) <= 24.5) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `ncaa-${g.id}-ats`;
+        const meta = { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
+        items.push({
+          key: k,
+          category: "NCAA",
+          badge: "🏀 NCAA ATS",
+          title: g.spread_pick,
+          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
+          tags: g.move_badges || [],
+          prob: g.spread_cover_pct,
+          evPct,
+          qKellyPct,
+          dots: "",
+          gameId: g.id
+        });
+      }
+    }
+    if (g.has_total && (g.total_edge_pts || 0) <= 14.0) {
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
+      if (evPct >= 3.0) {
+        const k = `ncaa-${g.id}-tot`;
+        const meta = { sport: "ncaa", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
+        items.push({
+          key: k,
+          category: "NCAA",
+          badge: "🏀 NCAA TOTAL",
+          title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
+          subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
+          tags: g.move_badges || [],
+          prob: g.total_cover_pct,
+          evPct,
+          qKellyPct,
+          dots: "",
+          gameId: g.id
+        });
+      }
+    }
+  }
+
+  items.sort((a, b) => b.evPct - a.evPct);
+  evBoard = items;
+  document.getElementById("evCount").textContent = evBoard.length;
+}
+
 function buildTopParlay() {
   const legs = [], usedGames = new Set();
-  const sortedNba = [...nbaPlayers].sort((a, b) => (b.best_prop?.prob || 0) - (a.best_prop?.prob || 0));
-  for (const p of sortedNba) {
-    if (legs.length >= 2) break;
-    const gKey = p.game_id || `${p.team}-${p.opponent}`;
-    if (!usedGames.has(gKey) && p.best_prop) {
-      const k = `nba-${p.id}-${p.best_prop.stat}-${p.best_prop.side || "O"}`;
-      const leg = { key: k, label: `${p.player} ${p.best_prop.market}`, prob: p.best_prop.prob, meta: { sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player, stat: p.best_prop.stat, side: p.best_prop.side || "O", line: p.best_prop.line } };
-      registerPick(k, leg.label, leg.prob, leg.meta);
-      legs.push(leg);
-      usedGames.add(gKey);
-    }
-  }
-  const sortedNbaG = [...nbaGames].filter(g => g.has_line).sort((a, b) => (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0));
-  for (const g of sortedNbaG) {
-    if (legs.length >= 3) break;
-    if (!usedGames.has(g.id)) {
-      const k = `nbagame-${g.id}-ats`;
-      const leg = { key: k, label: g.spread_pick, prob: g.spread_cover_pct, meta: { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: g.away_abbr, homeShort: g.home_abbr, pickText: g.spread_pick } };
-      registerPick(k, leg.label, leg.prob, leg.meta);
-      legs.push(leg);
-      usedGames.add(g.id);
-    }
-  }
-  const sortedNcaa = [...ncaaGames].filter(g => g.has_line && g.verified_d1 !== false && Math.abs(g.home_spread || 0) <= 24.5).sort((a, b) => (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0));
-  for (const g of sortedNcaa) {
+  for (const item of evBoard) {
     if (legs.length >= 4) break;
-    const k = `ncaa-${g.id}-ats`;
-    const leg = { key: k, label: g.spread_pick, prob: g.spread_cover_pct, meta: { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: g.away_short, homeShort: g.home_short, pickText: g.spread_pick } };
-    registerPick(k, leg.label, leg.prob, leg.meta);
-    legs.push(leg);
+    if (!usedGames.has(item.gameId)) {
+      legs.push({ key: item.key, label: item.title, prob: item.prob, meta: pickRegistry[item.key]?.meta || {} });
+      usedGames.add(item.gameId);
+    }
   }
   topParlayLegs = legs;
   const banner = document.getElementById("heroParlay");
@@ -350,7 +471,7 @@ function renderBetsTab() {
   document.getElementById("statRecord").textContent = `${wins}-${losses}`;
 
   if (!trackedBets.length) {
-    listEl.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; padding:24px 16px;"><div style="font-size:0.95rem; font-weight:800; margin-bottom:4px;">No Tracked Bets Yet</div><div style="font-size:0.76rem; color:var(--sub);">Tap any props or games in NBA / NCAA, apply your Kelly stake in the bottom drawer, and tap <strong>📌 Track Bet</strong> to sweat live stats here.</div></div>`;
+    listEl.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; padding:24px 16px;"><div style="font-size:0.95rem; font-weight:800; margin-bottom:4px;">No Tracked Bets Yet</div><div style="font-size:0.76rem; color:var(--sub);">Tap any +EV edge, apply your Kelly stake in the bottom drawer, and tap <strong>📌 Track Bet</strong> to sweat live stats here.</div></div>`;
     return;
   }
   listEl.innerHTML = trackedBets.map(bet => {
@@ -430,6 +551,53 @@ function render() {
   if (activeSport === "bets") { renderBetsTab(); return; }
   const listEl = document.getElementById("cardsList"), moreBtn = document.getElementById("loadMoreBtn");
   const q = document.getElementById("searchInput").value.toLowerCase().trim(), filter = document.getElementById("filterSelect").value;
+
+  if (activeSport === "ev") {
+    const bankroll = Math.max(1, parseFloat(document.getElementById("bankrollInput")?.value) || 500);
+    const filtered = evBoard.filter(item => {
+      if (q && !item.title.toLowerCase().includes(q) && !item.subtitle.toLowerCase().includes(q)) return false;
+      if (evFilter === "MAX" && item.evPct < 15.0) return false;
+      if (evFilter === "PROPS" && item.category !== "PROPS") return false;
+      if (evFilter === "NBAGAMES" && item.category !== "NBAGAMES") return false;
+      if (evFilter === "NCAA" && item.category !== "NCAA") return false;
+      if (filter === "edge" && item.evPct < 12.0) return false;
+      if (filter === "slip" && !slip.some(s => s.key === item.key)) return false;
+      return true;
+    });
+
+    const slice = filtered.slice(0, visibleLimit);
+    moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+    moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+
+    listEl.innerHTML = slice.map((item, idx) => {
+      const sel = slip.some(s => s.key === item.key);
+      const kellyDollar = Math.max(1, Math.round(bankroll * (item.qKellyPct / 100)));
+      const tagsHtml = (item.tags || []).slice(0, 3).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      return `<article class="card ${sel ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
+              <span class="s-tag gold">#${idx + 1} ${escHtml(item.badge)}</span>
+            </div>
+            <div class="c-name">${escHtml(item.title)}</div>
+            <div class="c-meta">${escHtml(item.subtitle)}</div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <button class="btn-quick-parlay" style="${sel ? "background:var(--cyan); color:#03131f;" : ""}" data-key="${escHtml(item.key)}" onclick="toggleSlipByKey(this.dataset.key)">
+            ${sel ? "✓ In Slip" : "+ Add"}
+          </button>
+        </div>
+        ${item.dots ? `<div class="streak-bar"><span>Last-10 Hit Form</span>${renderDots(item.dots)}</div>` : ""}
+        <div class="ev-metrics">
+          <div><div class="ev-m-lbl">Sim Win %</div><div class="ev-m-val" style="color:#fff;">${item.prob}%</div></div>
+          <div><div class="ev-m-lbl">+EV (-110)</div><div class="ev-m-val" style="color:var(--emerald);">+${item.evPct}%</div></div>
+          <div><div class="ev-m-lbl">1/4 Kelly</div><div class="ev-m-val" style="color:var(--cyan);">$${kellyDollar} (${item.qKellyPct}%)</div></div>
+        </div>
+      </article>`;
+    }).join("");
+    return;
+  }
 
   if (activeSport === "nba") {
     const sorted = [...nbaPlayers].sort((a, b) => {
@@ -530,6 +698,8 @@ async function loadAllData(force = false) {
     document.getElementById("nbaGamesCount").textContent = nbaGames.length;
     const ts = nbaGames[0]?.generated_at || ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
     document.getElementById("syncText").textContent = `Synced • ${ts}`;
+
+    buildEvBoard();
     buildTopParlay();
     render();
   } catch (e) {
