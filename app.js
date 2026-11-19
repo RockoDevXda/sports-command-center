@@ -487,4 +487,320 @@ async function refreshTrackedBets() {
           leg.clock = detail;
           if (state === "pre") { leg.status = "pending"; leg.liveScore = "Tipoff scheduled"; }
           else if (m.betType === "total") {
-            const comb
+            const comb = aS + hS; leg.currentVal = comb; leg.targetVal = m.line; leg.liveScore = `${sStr} (Tot: ${comb} vs ${m.line})`;
+            leg.status = state === "post" ? ((m.side === "O" ? comb > m.line : comb < m.line) ? "hit" : "miss") : "live";
+          } else if (m.betType === "ml") {
+            leg.liveScore = sStr;
+            const lead = (m.favoredTeam === m.homeShort) ? hS > aS : aS > hS;
+            leg.status = state === "post" ? (lead ? "hit" : "miss") : "live";
+          } else if (m.betType === "ats") {
+            leg.liveScore = sStr;
+            const parts = (m.pickText || "").split(" "), ln = parseFloat(parts[parts.length - 1]) || 0, tm = parts.slice(0, -1).join(" ");
+            const marg = (tm === m.homeShort) ? (hS + ln - aS) : (aS + ln - hS);
+            leg.status = state === "post" ? (marg > 0 ? "hit" : "miss") : "live";
+          }
+        }
+      }
+      if (bet.legs.some(l => l.status === "miss")) bet.status = "lost";
+      else if (bet.legs.length > 0 && bet.legs.every(l => l.status === "hit")) bet.status = "won";
+      else if (bet.legs.some(l => l.status === "live" || l.status === "hit")) bet.status = "live";
+      else bet.status = "pending";
+    }
+    persistBets();
+    if (statusEl) statusEl.textContent = `Live ESPN synced at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  } catch (e) { if (statusEl) statusEl.textContent = "Live check paused (offline)"; }
+  if (activeSport === "bets") renderBetsTab();
+}
+
+function extractNbaPlayerStat(sum, pid, pname, stat) {
+  if (!sum?.boxscore?.players) return 0;
+  for (const tb of sum.boxscore.players) {
+    const sg = tb.statistics?.[0];
+    if (!sg) continue;
+    const names = (sg.names || []).map(n => n.toUpperCase());
+    const iP = names.indexOf("PTS"), iR = names.indexOf("REB"), iA = names.indexOf("AST"), i3 = names.findIndex(n => n === "3PT" || n === "3PM");
+    for (const ae of (sg.athletes || [])) {
+      if ((pid && String(ae.athlete?.id) === pid) || (pname && ae.athlete?.displayName?.toLowerCase() === pname.toLowerCase())) {
+        const s = ae.stats || [], pts = parseFloat(s[iP]) || 0, reb = parseFloat(s[iR]) || 0, ast = parseFloat(s[iA]) || 0;
+        const tpm = (i3 >= 0 && s[i3]) ? (parseFloat(String(s[i3]).split("-")[0]) || 0) : 0;
+        if (stat === "PTS") return pts; if (stat === "REB") return reb; if (stat === "AST") return ast; if (stat === "3PM") return tpm; if (stat === "PRA") return pts + reb + ast;
+      }
+    }
+  }
+  return 0;
+}
+
+function renderDots(dotsStr) {
+  if (!dotsStr) return "";
+  return `<div class="dots-wrap">${dotsStr.split("").map(d => `<span class="g-dot ${d === "1" ? "hit" : ""}"></span>`).join("")}</div>`;
+}
+
+function renderBetsTab() {
+  const listEl = document.getElementById("cardsList");
+  document.getElementById("loadMoreBtn").style.display = "none";
+  let activeRisk = 0, netPL = 0, wins = 0, losses = 0;
+  trackedBets.forEach(b => {
+    if (b.status === "won") { wins++; netPL += (b.payout - b.stake); }
+    else if (b.status === "lost") { losses++; netPL -= b.stake; }
+    else activeRisk += b.stake;
+  });
+  document.getElementById("statActiveRisk").textContent = `$${activeRisk.toFixed(0)}`;
+  const plEl = document.getElementById("statNetPL");
+  plEl.textContent = `${netPL >= 0 ? "+" : "-"}$${Math.abs(netPL).toFixed(0)}`;
+  plEl.style.color = netPL >= 0 ? "var(--emerald)" : "var(--danger)";
+  document.getElementById("statRecord").textContent = `${wins}-${losses}`;
+
+  if (!trackedBets.length) {
+    listEl.innerHTML = `<div class="card" style="grid-column:1/-1; text-align:center; padding:24px 16px;"><div style="font-size:0.95rem; font-weight:800; margin-bottom:4px;">No Tracked Bets Yet</div><div style="font-size:0.76rem; color:var(--sub);">Tap any +EV edge, apply your Kelly stake in the bottom drawer, and tap <strong>📌 Track</strong> to sweat live stats here.</div></div>`;
+    return;
+  }
+  listEl.innerHTML = trackedBets.map(bet => {
+    const badgeMap = { won: `<span class="status-pill won">🏆 WON +$${(bet.payout - bet.stake).toFixed(0)}</span>`, lost: `<span class="status-pill lost">❌ LOST -$${bet.stake}</span>`, live: `<span class="status-pill live">⚡ LIVE SWEAT</span>`, pending: `<span class="status-pill pending">⏳ UPCOMING</span>` };
+    const legsHtml = bet.legs.map(leg => {
+      const icon = leg.status === "hit" ? "✅" : (leg.status === "miss" ? "❌" : (leg.status === "live" ? "⚡" : "⏳"));
+      const pct = leg.targetVal > 0 ? Math.min(100, Math.round((leg.currentVal / leg.targetVal) * 100)) : 0;
+      const showBar = leg.meta?.sport === "nba" || leg.meta?.betType === "total";
+      return `<div class="leg-row"><div class="leg-top"><span>${icon} ${escHtml(leg.label)}</span><span style="color:var(--emerald); font-size:0.7rem;">${leg.prob}%</span></div><div class="leg-sub"><span>${escHtml(leg.liveScore)}</span><span>${escHtml(leg.clock || "")}</span></div>${showBar ? `<div class="prog-track"><div class="prog-fill ${leg.status}" style="width:${pct}%"></div></div>` : ""}</div>`;
+    }).join("");
+    return `<article class="bet-card ${bet.status}">
+      <div class="c-head">
+        <div>
+          <div class="c-name">${bet.legs.length}-Leg ${bet.legs.length === 1 ? "Straight" : "Parlay"} • $${bet.stake} → $${bet.payout}</div>
+          <div class="c-meta">Placed ${escHtml(bet.createdAt)}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          ${badgeMap[bet.status] || badgeMap.pending}
+          <button class="btn-sm" style="padding:2px 6px; font-size:0.68rem; border-color:var(--cyan); color:var(--cyan);" data-id="${escHtml(bet.id)}" onclick="shareSavedBet(this.dataset.id)">📤</button>
+          <button class="btn-sm" style="padding:2px 6px; font-size:0.68rem;" data-id="${escHtml(bet.id)}" onclick="deleteTrackedBet(this.dataset.id)">🗑️</button>
+        </div>
+      </div>
+      ${legsHtml}
+    </article>`;
+  }).join("");
+}
+
+function renderGameCards(gamesList, prefix, sportTag, activeSubFilter, q, filter, listEl, moreBtn) {
+  const sorted = [...gamesList].sort((a, b) => {
+    if (activeSubFilter === "TOTALS") return (b.total_cover_pct || 0) - (a.total_cover_pct || 0);
+    if (activeSubFilter === "SPREADS") return (b.spread_cover_pct || 0) - (a.spread_cover_pct || 0);
+    if (activeSubFilter === "MOVES") return (Math.abs(b.spread_move || 0) + Math.abs(b.total_move || 0)) - (Math.abs(a.spread_move || 0) + Math.abs(a.total_move || 0));
+    if (activeSubFilter === "B2B") return (b.has_b2b ? 1 : 0) - (a.has_b2b ? 1 : 0);
+    return Math.max(b.spread_cover_pct || 0, b.total_cover_pct || 0) - Math.max(a.spread_cover_pct || 0, a.total_cover_pct || 0);
+  });
+
+  const filtered = sorted.filter(g => {
+    const awayLbl = g.away_abbr || g.away_short || "";
+    const homeLbl = g.home_abbr || g.home_short || "";
+    if (q && !(g.away_team || "").toLowerCase().includes(q) && !(g.home_team || "").toLowerCase().includes(q) && !awayLbl.toLowerCase().includes(q) && !homeLbl.toLowerCase().includes(q)) return false;
+    if (activeSubFilter === "B2B" && !g.has_b2b) return false;
+    if (activeSubFilter === "MOVES" && !g.has_move) return false;
+    if (activeSubFilter === "TOTALS" && !g.has_total) return false;
+    if (activeSubFilter === "SPREADS" && !g.has_line) return false;
+    if (filter === "edge" && (g.spread_cover_pct || 0) < 57 && (g.total_cover_pct || 0) < 57) return false;
+    if (filter === "slip" && !slip.some(s => s.key.startsWith(`${prefix}-${g.id}`))) return false;
+    return true;
+  });
+
+  const slice = filtered.slice(0, visibleLimit);
+  moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+  moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+
+  listEl.innerHTML = slice.map(g => {
+    const awayLbl = g.away_abbr || g.away_short;
+    const homeLbl = g.home_abbr || g.home_short;
+    const atsKey = `${prefix}-${g.id}-ats`, totKey = `${prefix}-${g.id}-tot`, mlKey = `${prefix}-${g.id}-ml`;
+    if (g.has_line) registerPick(atsKey, g.spread_pick, g.spread_cover_pct, { sport: sportTag, betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick });
+    if (g.has_total) registerPick(totKey, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, { sport: sportTag, betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under });
+    registerPick(mlKey, `${g.favored_team} ML`, g.favored_prob, { sport: sportTag, betType: "ml", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, favoredTeam: g.favored_team });
+
+    const atsSel = slip.some(s => s.key === atsKey), totSel = slip.some(s => s.key === totKey), mlSel = slip.some(s => s.key === mlKey);
+    const simTotal = g.total_proj || +(g.away_proj + g.home_proj).toFixed(1);
+    const moveTags = (g.move_badges || []).map(b => `<span class="s-tag ${b.includes("B2B") ? "" : "cyan"}">${escHtml(b)}</span>`).join("");
+
+    return `<article class="card ${(atsSel || totSel || mlSel) ? "in-slip" : ""}">
+      <div class="c-head">
+        <div>
+          <div class="c-name">${escHtml(awayLbl)} @ ${escHtml(homeLbl)}</div>
+          <div class="c-meta">${escHtml(g.tipoff || "")} • ${escHtml(g.market_line || "PK")}${g.has_total ? ` • O/U ${g.over_under}` : ""}${g.exp_pace ? ` • Pace ${g.exp_pace}` : ""}</div>
+          ${moveTags ? `<div class="sharp-tags">${moveTags}</div>` : ""}
+        </div>
+        ${g.has_line ? `<span class="edge-tag">+${g.edge_pts} ATS</span>` : ""}
+      </div>
+      ${g.h2h_summary ? `<div class="h2h-bar">📜 ${escHtml(g.h2h_summary)}</div>` : ""}
+      <div class="ncaa-scores">
+        <span><strong>${escHtml(awayLbl)}</strong> ${g.away_proj} • <strong>${escHtml(homeLbl)}</strong> ${g.home_proj}</span>
+        <span style="color:var(--cyan); font-weight:700;">Tot: ${simTotal}</span>
+      </div>
+      <div class="ncaa-grid">
+        ${g.has_line ? `<button class="p-btn ${atsSel ? "selected" : ""} ${g.spread_cover_pct >= 58 ? "hot" : ""}" data-key="${escHtml(atsKey)}" onclick="toggleSlipByKey(this.dataset.key)"><span>${escHtml(g.spread_pick)}</span><span class="prob-val">${g.spread_cover_pct}%</span></button>` : `<button class="p-btn" disabled><span>No Line</span></button>`}
+        ${g.has_total ? `<button class="p-btn ${totSel ? "selected" : ""} ${g.total_cover_pct >= 58 ? "hot" : ""}" data-key="${escHtml(totKey)}" onclick="toggleSlipByKey(this.dataset.key)"><span>${escHtml(g.total_pick)}</span><span class="prob-val">${g.total_cover_pct}%</span></button>` : `<button class="p-btn" disabled><span>No O/U</span></button>`}
+        <button class="p-btn ${mlSel ? "selected" : ""} ${g.favored_prob >= 70 ? "hot" : ""}" data-key="${escHtml(mlKey)}" onclick="toggleSlipByKey(this.dataset.key)"><span>${escHtml(g.favored_team)} ML</span><span class="prob-val">${g.favored_prob}%</span></button>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function render() {
+  if (activeSport === "bets") { renderBetsTab(); return; }
+  const listEl = document.getElementById("cardsList"), moreBtn = document.getElementById("loadMoreBtn");
+  const q = document.getElementById("searchInput").value.toLowerCase().trim(), filter = document.getElementById("filterSelect").value;
+
+  if (activeSport === "ev") {
+    const bankroll = Math.max(1, parseFloat(document.getElementById("bankrollInput")?.value) || 500);
+    const filtered = evBoard.filter(item => {
+      if (q && !item.title.toLowerCase().includes(q) && !item.subtitle.toLowerCase().includes(q)) return false;
+      if (evFilter === "MAX" && item.evPct < 15.0) return false;
+      if (evFilter === "PROPS" && item.category !== "PROPS") return false;
+      if (evFilter === "NBAGAMES" && item.category !== "NBAGAMES") return false;
+      if (evFilter === "NCAA" && item.category !== "NCAA") return false;
+      if (filter === "edge" && item.evPct < 12.0) return false;
+      if (filter === "slip" && !slip.some(s => s.key === item.key)) return false;
+      return true;
+    });
+
+    const slice = filtered.slice(0, visibleLimit);
+    moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+    moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+
+    listEl.innerHTML = slice.map((item, idx) => {
+      const sel = slip.some(s => s.key === item.key);
+      const kellyDollar = Math.max(1, Math.round(bankroll * (item.qKellyPct / 100)));
+      const tagsHtml = (item.tags || []).slice(0, 3).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      return `<article class="card ${sel ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
+              <span class="s-tag gold">#${idx + 1} ${escHtml(item.badge)}</span>
+            </div>
+            <div class="c-name">${escHtml(item.title)}</div>
+            <div class="c-meta">${escHtml(item.subtitle)}</div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <button class="btn-quick-parlay" style="${sel ? "background:var(--cyan); color:#03131f;" : ""}" data-key="${escHtml(item.key)}" onclick="toggleSlipByKey(this.dataset.key)">
+            ${sel ? "✓ In Slip" : "+ Add"}
+          </button>
+        </div>
+        ${item.dots ? `<div class="streak-bar"><span>Last-10 Hit Form</span>${renderDots(item.dots)}</div>` : ""}
+        <div class="ev-metrics">
+          <div><div class="ev-m-lbl">Sim Win %</div><div class="ev-m-val" style="color:#fff;">${item.prob}%</div></div>
+          <div><div class="ev-m-lbl">+EV (-110)</div><div class="ev-m-val" style="color:var(--emerald);">+${item.evPct}%</div></div>
+          <div><div class="ev-m-lbl">1/4 Kelly</div><div class="ev-m-val" style="color:var(--cyan);">$${kellyDollar} (${item.qKellyPct}%)</div></div>
+        </div>
+      </article>`;
+    }).join("");
+    return;
+  }
+
+  if (activeSport === "nba") {
+    const sorted = [...nbaPlayers].sort((a, b) => {
+      if (subFilter === "ALTS") return ((b.alt_props?.[0]?.prob || 0) - (a.alt_props?.[0]?.prob || 0));
+      if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) return (b.all_props?.find(x => x.stat === subFilter)?.prob || 0) - (a.all_props?.find(x => x.stat === subFilter)?.prob || 0);
+      return (b.best_prop?.prob || 0) - (a.best_prop?.prob || 0);
+    });
+    const filtered = sorted.filter(p => {
+      if (q && !p.player.toLowerCase().includes(q) && !p.team.toLowerCase().includes(q) && !p.opponent.toLowerCase().includes(q)) return false;
+      if (subFilter === "WATCH" && !watchlist.includes(String(p.id))) return false;
+      if (subFilter === "UNDERS" && !p.has_under && !(p.all_props || []).some(x => x.side === "U")) return false;
+      if (subFilter === "ALTS" && (!p.alt_props || p.alt_props.length === 0)) return false;
+      if (subFilter === "USG" && (p.usage_bump_pct || 0) <= 0) return false;
+      if (subFilter === "HOT" && (p.best_prop?.hits || 0) < 8) return false;
+      if (filter === "edge" && (p.best_prop?.prob || 0) < 58 && (p.usage_bump_pct || 0) <= 0) return false;
+      if (filter === "slip" && !slip.some(s => s.key.startsWith(`nba-${p.id}`))) return false;
+      return true;
+    });
+    const slice = filtered.slice(0, visibleLimit);
+    moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+    moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+    listEl.innerHTML = slice.map(p => {
+      const pidStr = String(p.id);
+      const isWatched = watchlist.includes(pidStr);
+      const inSlip = slip.some(s => s.key.startsWith(`nba-${pidStr}`));
+
+      let pool = p.all_props || [];
+      if (subFilter === "ALTS") pool = p.alt_props || [];
+      else if (subFilter === "UNDERS") pool = (p.all_props || []).filter(m => m.side === "U");
+      else if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) pool = (p.all_props || []).filter(m => m.stat === subFilter);
+
+      const selectedKey = activePropByPlayer[pidStr];
+      const focusProp = (selectedKey && [...(p.all_props || []), ...(p.alt_props || [])].find(x => (x.market || x.stat) === selectedKey || x.stat === selectedKey)) || pool[0] || p.best_prop || {};
+      const tagsHtml = (p.tags || []).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      return `<article class="card ${inSlip ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div class="c-name">${escHtml(p.player)} <span class="c-meta">• ${escHtml(p.team)} vs ${escHtml(p.opponent)} (${p.avg_min}m)</span></div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="c-meta">O/U ${p.game_total}</span>
+            <button class="btn-sm" style="padding:2px 6px; font-size:0.75rem; border-color:${isWatched ? "var(--orange)" : "var(--border)"}; color:${isWatched ? "var(--orange)" : "var(--muted)"};" onclick="toggleWatch('${escHtml(pidStr)}', event)">${isWatched ? "★" : "☆"}</button>
+          </div>
+        </div>
+        ${focusProp.dots ? `<div class="streak-bar"><span><strong>${escHtml(focusProp.market)}</strong> Recent Form: <strong style="color:var(--emerald);">${escHtml(focusProp.hit_str)}</strong></span>${renderDots(focusProp.dots)}</div>` : ""}
+        <div class="prop-grid" style="${pool.length === 1 ? "grid-template-columns:1fr;" : ""}">
+          ${pool.map(m => {
+            const side = m.side || "O";
+            const isAlt = Boolean(m.is_alt || subFilter === "ALTS");
+            const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
+            registerPick(k, `${p.player} ${m.market}`, m.prob, {
+              sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+              stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market
+            });
+            const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
+            return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""} ${isAlt ? "alt-btn" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)">
+              <div>
+                <span>${escHtml(m.market)}</span>
+                <span class="sim-hint">Sim: ${m.proj}${isAlt && m.fair_odds ? ` • ${m.fair_odds}` : ""}</span>
+              </div>
+              <div class="prob-val">
+                <span>${m.prob}%</span>
+                ${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}
+              </div>
+            </button>`;
+          }).join("")}
+        </div>
+      </article>`;
+    }).join("");
+  } else if (activeSport === "nbagames") {
+    renderGameCards(nbaGames, "nbagame", "nbagame", nbaGamesFilter, q, filter, listEl, moreBtn);
+  } else {
+    renderGameCards(ncaaGames, "ncaa", "ncaa", ncaaFilter, q, filter, listEl, moreBtn);
+  }
+}
+
+async function loadAllData(force = false) {
+  const savedBr = localStorage.getItem(BANKROLL_KEY);
+  if (savedBr && document.getElementById("bankrollInput")) document.getElementById("bankrollInput").value = savedBr;
+
+  const savedBk = localStorage.getItem(BOOK_KEY);
+  if (savedBk && document.getElementById("sportsbookSelect")) document.getElementById("sportsbookSelect").value = savedBk;
+
+  const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
+  document.getElementById("syncText").textContent = "Syncing...";
+  document.getElementById("betsCount").textContent = trackedBets.length;
+  try {
+    const [ncaaRes, nbaRes, nbaGamesRes] = await Promise.allSettled([
+      fetch(NCAA_JSON_URL + bust),
+      fetch(NBA_JSON_URL + bust),
+      fetch(NBA_GAMES_JSON_URL + bust)
+    ]);
+    if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) ncaaGames = await ncaaRes.value.json();
+    if (nbaRes.status === "fulfilled" && nbaRes.value.ok) nbaPlayers = await nbaRes.value.json();
+    if (nbaGamesRes.status === "fulfilled" && nbaGamesRes.value.ok) nbaGames = await nbaGamesRes.value.json();
+
+    document.getElementById("ncaaCount").textContent = ncaaGames.length;
+    document.getElementById("nbaCount").textContent = nbaPlayers.length;
+    document.getElementById("nbaGamesCount").textContent = nbaGames.length;
+    const ts = nbaGames[0]?.generated_at || ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
+    document.getElementById("syncText").textContent = `Synced • ${ts}`;
+
+    buildEvBoard();
+    buildTopParlay();
+    render();
+  } catch (e) {
+    document.getElementById("syncText").textContent = "Offline cache";
+  }
+}
+
+loadAllData();
