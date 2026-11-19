@@ -12,64 +12,55 @@ const SPORTSBOOKS = {
     name: "PrizePicks",
     mode: "pickem",
     web: "https://app.prizepicks.com/",
-    ios: "prizepicks://",
-    pkg: "com.prizepicks.PrizePicks"
+    scheme: "prizepicks://"
   },
   ud: {
     name: "Underdog",
     mode: "pickem",
     web: "https://underdogfantasy.com/pick-em",
-    ios: "underdog://",
-    pkg: "com.underdog.fantasy.android"
+    scheme: "underdog://"
   },
   dk: {
     name: "DraftKings",
     mode: "book",
     web: "https://sportsbook.draftkings.com/",
-    ios: "dksb://",
-    pkg: "com.draftkings.sportsbook"
+    scheme: "dksb://"
   },
   pk6: {
     name: "DK Pick6",
     mode: "pickem",
     web: "https://pick6.draftkings.com/",
-    ios: "dkpick6://",
-    pkg: "com.draftkings.pick6"
+    scheme: "dkpick6://"
   },
   fd: {
     name: "FanDuel",
     mode: "book",
     web: "https://sportsbook.fanduel.com/",
-    ios: "fanduel://",
-    pkg: "com.fanduel.android.self"
+    scheme: "fanduel://"
   },
   hr: {
     name: "Hard Rock Bet",
     mode: "book",
     web: "https://app.hardrock.bet/",
-    ios: "hardrockbet://",
-    pkg: "com.hardrock.sportsbook"
+    scheme: "hardrockbet://"
   },
   mgm: {
     name: "BetMGM",
     mode: "book",
     web: "https://sports.betmgm.com/",
-    ios: "betmgm://",
-    pkg: "com.betmgm.sportsbook.android"
+    scheme: "betmgm://"
   },
   sl: {
     name: "Sleeper",
     mode: "pickem",
     web: "https://sleeper.com/picks",
-    ios: "sleeper://",
-    pkg: "com.sleeperbot"
+    scheme: "sleeper://"
   },
   betr: {
     name: "Betr Picks",
     mode: "pickem",
     web: "https://betr.app/",
-    ios: "betr://",
-    pkg: "app.betr.mobile"
+    scheme: "betr://"
   }
 };
 
@@ -171,6 +162,21 @@ function formatSlipForPlatform(mode) {
   ].join("\n");
 }
 
+function copyTextSync(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+}
+
 async function triggerShareOrCopy(text, btnEl, defaultLabel) {
   if (navigator.share) {
     try {
@@ -180,12 +186,10 @@ async function triggerShareOrCopy(text, btnEl, defaultLabel) {
       if (e.name === "AbortError") return;
     }
   }
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text);
-    if (btnEl) {
-      btnEl.textContent = "✓ Copied!";
-      setTimeout(() => { btnEl.textContent = defaultLabel; }, 1800);
-    }
+  copyTextSync(text);
+  if (btnEl) {
+    btnEl.textContent = "✓ Copied!";
+    setTimeout(() => { btnEl.textContent = defaultLabel; }, 1800);
   }
 }
 
@@ -211,46 +215,32 @@ function shareSavedBet(betId) {
   triggerShareOrCopy(lines, null, "📤");
 }
 
-async function openSportsbookWithSlip() {
+function openSportsbookWithSlip() {
   if (!slip.length) return;
   const bkKey = document.getElementById("sportsbookSelect").value || "pp";
   const book = SPORTSBOOKS[bkKey] || SPORTSBOOKS.pp;
   const text = formatSlipForPlatform(book.mode);
 
-  if (navigator.clipboard) {
-    try { await navigator.clipboard.writeText(text); } catch (e) {}
-  }
+  // Copy synchronously so the browser keeps the user tap gesture alive
+  copyTextSync(text);
 
   const btn = document.getElementById("openBookBtn");
   btn.textContent = `✓ Copied! Launching ${book.name}...`;
   setTimeout(() => { btn.textContent = "🚀 Copy & Open App"; }, 2400);
 
   const ua = navigator.userAgent || "";
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
 
-  const a = document.createElement("a");
-  a.style.display = "none";
-  document.body.appendChild(a);
-
-  if (isAndroid && book.pkg) {
-    const cleanHostPath = book.web.replace(/^https?:\/\//, "");
-    const fallbackEncoded = encodeURIComponent(book.web);
-    a.href = `intent://${cleanHostPath}#Intent;scheme=https;package=${book.pkg};S.browser_fallback_url=${fallbackEncoded};end`;
-    a.click();
-  } else if (isIOS && book.ios) {
-    a.href = book.ios;
-    a.click();
+  if (isMobile && book.scheme) {
+    window.location.href = book.scheme;
     setTimeout(() => {
-      if (!document.hidden) window.location.href = book.web;
-    }, 1200);
+      if (!document.hidden) {
+        window.location.href = book.web;
+      }
+    }, 1500);
   } else {
-    a.href = book.web;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.click();
+    window.open(book.web, "_blank", "noopener");
   }
-  a.remove();
 }
 
 function switchSport(sport) {
