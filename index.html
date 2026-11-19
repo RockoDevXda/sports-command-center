@@ -69,6 +69,8 @@
     .p-btn .prob-val { font-weight: 800; color: var(--sub); text-align: right; }
     .p-btn .hit-mini { display: block; font-size: 0.6rem; color: var(--muted); font-weight: 600; }
     .p-btn.hot .prob-val, .p-btn.selected .prob-val { color: var(--emerald); }
+    .p-btn.alt-btn { border-color: rgba(168,85,247,0.4); }
+    .p-btn.alt-btn .prob-val { color: var(--purple); }
     .p-btn.selected { background: var(--emerald-dim); border-color: var(--emerald); }
     .ncaa-scores { display: flex; justify-content: space-between; align-items: center; background: #0a0e14; padding: 6px 9px; border-radius: 7px; font-size: 0.75rem; font-variant-numeric: tabular-nums; gap: 6px; }
     .h2h-bar { font-size: 0.67rem; color: var(--sub); background: #090c11; border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; }
@@ -137,8 +139,10 @@
       </select>
     </div>
     <div class="chip-strip" id="nbaChips">
-      <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PLAYERS</button>
+      <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PROPS</button>
       <button class="f-chip" onclick="setSubFilter('WATCH', this)">⭐ WATCHLIST</button>
+      <button class="f-chip" onclick="setSubFilter('UNDERS', this)">⬇️ UNDERS</button>
+      <button class="f-chip" onclick="setSubFilter('ALTS', this)">🪜 ALT LADDERS</button>
       <button class="f-chip" onclick="setSubFilter('HOT', this)">🔥 8/10 STREAKS</button>
       <button class="f-chip" onclick="setSubFilter('USG', this)">⚡ USAGE BUMPS</button>
       <button class="f-chip" onclick="setSubFilter('PTS', this)">POINTS</button>
