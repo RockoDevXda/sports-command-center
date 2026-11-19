@@ -99,6 +99,9 @@
     .prog-fill { height: 100%; background: var(--cyan); border-radius: 999px; transition: width 0.3s ease; }
     .prog-fill.hit { background: var(--emerald); }
     .prog-fill.miss { background: var(--danger); }
+    .hedge-drawer { background: #080b10; border: 1px solid rgba(234,179,8,0.4); border-radius: 8px; padding: 9px 10px; display: flex; flex-direction: column; gap: 7px; }
+    .hedge-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; font-weight: 800; color: var(--gold); gap: 6px; }
+    .hedge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; background: #0d121a; border: 1px solid var(--border); border-radius: 6px; padding: 6px; font-variant-numeric: tabular-nums; }
     .slip-bar { position: fixed; bottom: 10px; left: 10px; right: 10px; max-width: 1096px; margin: 0 auto; background: rgba(13,18,26,0.98); border: 1px solid var(--emerald); border-radius: 12px; padding: 10px 12px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(12px); display: none; flex-direction: column; gap: 7px; }
     body.has-slip .slip-bar { display: flex; }
     .slip-top, .kelly-row, .book-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
