@@ -20,7 +20,7 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.35; padding-bottom: 32px; -webkit-font-smoothing: antialiased; }
-    body.has-slip { padding-bottom: 175px; }
+    body.has-slip { padding-bottom: 205px; }
     .wrap { max-width: 1120px; margin: 0 auto; padding: 0 12px; }
     header { padding: 12px 0 10px; border-bottom: 1px solid var(--border); }
     .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -48,6 +48,7 @@
     .parlay-banner-text { font-size: 0.76rem; font-weight: 700; color: #fff; }
     .parlay-banner-sub { font-size: 0.68rem; color: var(--emerald); font-weight: 600; }
     .btn-quick-parlay { background: var(--emerald); color: #03150a; border: none; padding: 6px 10px; border-radius: 7px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; cursor: pointer; }
+    .btn-book { background: var(--purple); color: #fff; border: none; padding: 5px 10px; border-radius: 7px; font-size: 0.7rem; font-weight: 800; white-space: nowrap; cursor: pointer; }
     .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(335px, 1fr)); gap: 9px; }
     .card, .bet-card { background: var(--card); border: 1px solid var(--border); border-radius: 11px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; }
     .card.in-slip, .bet-card.won { border-color: var(--emerald); }
@@ -99,10 +100,11 @@
     .prog-fill.miss { background: var(--danger); }
     .slip-bar { position: fixed; bottom: 10px; left: 10px; right: 10px; max-width: 1096px; margin: 0 auto; background: rgba(13,18,26,0.98); border: 1px solid var(--emerald); border-radius: 12px; padding: 10px 12px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(12px); display: none; flex-direction: column; gap: 7px; }
     body.has-slip .slip-bar { display: flex; }
-    .slip-top, .kelly-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .kelly-row { background: #090c11; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 0.69rem; }
+    .slip-top, .kelly-row, .book-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .kelly-row, .book-row { background: #090c11; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 0.69rem; }
     .stake-box { display: inline-flex; align-items: center; background: #0a0e14; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 0.7rem; font-weight: 700; color: var(--emerald); gap: 2px; }
     .stake-box input { width: 46px; background: transparent; border: none; color: #fff; font-size: 0.72rem; font-weight: 800; outline: none; text-align: right; }
+    .book-sel { background: #0a0e14; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 3px 6px; font-size: 0.7rem; font-weight: 700; }
     .kelly-pill { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35); padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.69rem; cursor: pointer; }
     .kelly-pill.no-edge { background: var(--danger-dim); color: var(--danger); border-color: rgba(239,68,68,0.35); }
     .slip-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
@@ -227,6 +229,23 @@
       </select>
     </div>
     <button id="kellyApplyBtn" class="kelly-pill" onclick="applyKellyStake()">⚡ Kelly: $0 (0%)</button>
+  </div>
+  <div class="book-row">
+    <div style="display:flex; align-items:center; gap:5px;">
+      <span style="color:var(--sub); font-weight:700;">Platform</span>
+      <select id="sportsbookSelect" class="book-sel" onchange="savePreferredBook()">
+        <option value="pp">PrizePicks (Pick'em)</option>
+        <option value="ud">Underdog (Pick'em)</option>
+        <option value="dk">DraftKings Sportsbook</option>
+        <option value="pk6">DraftKings Pick6</option>
+        <option value="fd">FanDuel Sportsbook</option>
+        <option value="hr">Hard Rock Bet</option>
+        <option value="mgm">BetMGM</option>
+        <option value="sl">Sleeper Picks</option>
+        <option value="betr">Betr Picks</option>
+      </select>
+    </div>
+    <button id="openBookBtn" class="btn-book" onclick="openSportsbookWithSlip()">🚀 Copy & Open App</button>
   </div>
   <div class="slip-chips" id="slipChips"></div>
 </div>
