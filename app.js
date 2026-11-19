@@ -102,7 +102,7 @@ function registerPick(key, label, prob, meta) { pickRegistry[key] = { key, label
 function toggleSlipByKey(key) {
   const pick = pickRegistry[key];
   if (pick?.meta?.sport === "nba" && pick.meta.playerId) {
-    activePropByPlayer[String(pick.meta.playerId)] = pick.meta.stat;
+    activePropByPlayer[String(pick.meta.playerId)] = pick.meta.marketKey || pick.meta.stat;
   }
   const idx = slip.findIndex(s => s.key === key);
   if (idx !== -1) slip.splice(idx, 1);
@@ -135,9 +135,12 @@ function updateSlipUI(recalcDefaultOdds = true) {
   const oddsEl = document.getElementById("bookOddsInput");
   if (recalcDefaultOdds) {
     if (slip.length === 1) {
-      oddsEl.value = "-110";
+      oddsEl.value = slip[0].meta?.fairOdds && slip[0].meta.isAlt ? slip[0].meta.fairOdds : "-110";
     } else {
-      const decParlay = Math.pow(1.909, slip.length);
+      let decParlay = 1.0;
+      slip.forEach(s => {
+        decParlay *= (s.meta?.isAlt && s.meta?.fairOdds) ? americanToDecimal(s.meta.fairOdds) : 1.909;
+      });
       oddsEl.value = `+${Math.round((decParlay - 1) * 100)}`;
     }
   }
@@ -202,7 +205,7 @@ function buildTopParlay() {
     if (legs.length >= 2) break;
     const gKey = p.game_id || `${p.team}-${p.opponent}`;
     if (!usedGames.has(gKey) && p.best_prop) {
-      const k = `nba-${p.id}-${p.best_prop.stat}`;
+      const k = `nba-${p.id}-${p.best_prop.stat}-${p.best_prop.side || "O"}`;
       const leg = { key: k, label: `${p.player} ${p.best_prop.market}`, prob: p.best_prop.prob, meta: { sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player, stat: p.best_prop.stat, side: p.best_prop.side || "O", line: p.best_prop.line } };
       registerPick(k, leg.label, leg.prob, leg.meta);
       legs.push(leg);
@@ -260,12 +263,18 @@ async function refreshTrackedBets() {
           const ev = nbaEvents[gid], state = ev.status?.type?.state || "pre", detail = ev.status?.type?.shortDetail || "";
           const comp = ev.competitions?.[0], away = comp?.competitors?.find(c => c.homeAway === "away"), home = comp?.competitors?.find(c => c.homeAway === "home");
           leg.clock = `${away?.team?.abbreviation || ""} ${away?.score || 0} - ${home?.team?.abbreviation || ""} ${home?.score || 0} • ${detail}`;
+          const isUnder = m.side === "U";
           if (state === "pre") { leg.status = "pending"; leg.liveScore = `0 / ${m.line} ${m.stat}`; }
           else {
             if (!nbaBoxCache[gid]) { try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gid}`); if (r.ok) nbaBoxCache[gid] = await r.json(); } catch (e) {} }
             const val = extractNbaPlayerStat(nbaBoxCache[gid], String(m.playerId || ""), m.playerName, m.stat);
             leg.currentVal = val; leg.targetVal = m.line; leg.liveScore = `${val} / ${m.line} ${m.stat}`;
-            leg.status = state === "post" ? (val > m.line ? "hit" : "miss") : (val > m.line ? "hit" : "live");
+            if (isUnder) {
+              if (val > m.line) leg.status = "miss";
+              else leg.status = state === "post" ? "hit" : "live";
+            } else {
+              leg.status = state === "post" ? (val > m.line ? "hit" : "miss") : (val > m.line ? "hit" : "live");
+            }
           }
         } else if ((m.sport === "ncaa" || m.sport === "nbagame") && gid) {
           const ev = m.sport === "nbagame" ? nbaEvents[gid] : ncaaEvents[gid];
@@ -424,12 +433,15 @@ function render() {
 
   if (activeSport === "nba") {
     const sorted = [...nbaPlayers].sort((a, b) => {
+      if (subFilter === "ALTS") return ((b.alt_props?.[0]?.prob || 0) - (a.alt_props?.[0]?.prob || 0));
       if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) return (b.all_props?.find(x => x.stat === subFilter)?.prob || 0) - (a.all_props?.find(x => x.stat === subFilter)?.prob || 0);
       return (b.best_prop?.prob || 0) - (a.best_prop?.prob || 0);
     });
     const filtered = sorted.filter(p => {
       if (q && !p.player.toLowerCase().includes(q) && !p.team.toLowerCase().includes(q) && !p.opponent.toLowerCase().includes(q)) return false;
       if (subFilter === "WATCH" && !watchlist.includes(String(p.id))) return false;
+      if (subFilter === "UNDERS" && !p.has_under && !(p.all_props || []).some(x => x.side === "U")) return false;
+      if (subFilter === "ALTS" && (!p.alt_props || p.alt_props.length === 0)) return false;
       if (subFilter === "USG" && (p.usage_bump_pct || 0) <= 0) return false;
       if (subFilter === "HOT" && (p.best_prop?.hits || 0) < 8) return false;
       if (filter === "edge" && (p.best_prop?.prob || 0) < 58 && (p.usage_bump_pct || 0) <= 0) return false;
@@ -443,10 +455,15 @@ function render() {
       const pidStr = String(p.id);
       const isWatched = watchlist.includes(pidStr);
       const inSlip = slip.some(s => s.key.startsWith(`nba-${pidStr}`));
-      const selectedStat = activePropByPlayer[pidStr] || (["PTS", "REB", "AST", "PRA"].includes(subFilter) ? subFilter : null);
-      const focusProp = (selectedStat && p.all_props?.find(x => x.stat === selectedStat)) || p.best_prop || {};
-      const propsToShow = ["PTS", "REB", "AST", "PRA"].includes(subFilter) ? (p.all_props || []).filter(m => m.stat === subFilter) : (p.all_props || []);
-      const tagsHtml = (p.tags || []).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      let pool = p.all_props || [];
+      if (subFilter === "ALTS") pool = p.alt_props || [];
+      else if (subFilter === "UNDERS") pool = (p.all_props || []).filter(m => m.side === "U");
+      else if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) pool = (p.all_props || []).filter(m => m.stat === subFilter);
+
+      const selectedKey = activePropByPlayer[pidStr];
+      const focusProp = (selectedKey && [...(p.all_props || []), ...(p.alt_props || [])].find(x => (x.market || x.stat) === selectedKey || x.stat === selectedKey)) || pool[0] || p.best_prop || {};
+      const tagsHtml = (p.tags || []).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
 
       return `<article class="card ${inSlip ? "in-slip" : ""}">
         <div class="c-head">
@@ -460,12 +477,26 @@ function render() {
           </div>
         </div>
         ${focusProp.dots ? `<div class="streak-bar"><span><strong>${escHtml(focusProp.market)}</strong> Recent Form: <strong style="color:var(--emerald);">${escHtml(focusProp.hit_str)}</strong></span>${renderDots(focusProp.dots)}</div>` : ""}
-        <div class="prop-grid" style="${propsToShow.length === 1 ? "grid-template-columns:1fr;" : ""}">
-          ${propsToShow.map(m => {
-            const k = `nba-${pidStr}-${m.stat}`;
-            registerPick(k, `${p.player} ${m.market}`, m.prob, { sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player, stat: m.stat, side: m.side || "O", line: m.line });
+        <div class="prop-grid" style="${pool.length === 1 ? "grid-template-columns:1fr;" : ""}">
+          ${pool.map(m => {
+            const side = m.side || "O";
+            const isAlt = Boolean(m.is_alt || subFilter === "ALTS");
+            const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
+            registerPick(k, `${p.player} ${m.market}`, m.prob, {
+              sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+              stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market
+            });
             const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
-            return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)"><div><span>${escHtml(m.market)}</span><span class="sim-hint">Sim: ${m.proj}</span></div><div class="prob-val"><span>${m.prob}%</span>${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}</div></button>`;
+            return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""} ${isAlt ? "alt-btn" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)">
+              <div>
+                <span>${escHtml(m.market)}</span>
+                <span class="sim-hint">Sim: ${m.proj}${isAlt && m.fair_odds ? ` • ${m.fair_odds}` : ""}</span>
+              </div>
+              <div class="prob-val">
+                <span>${m.prob}%</span>
+                ${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}
+              </div>
+            </button>`;
           }).join("")}
         </div>
       </article>`;
