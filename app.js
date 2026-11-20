@@ -48,6 +48,11 @@ function escHtml(s) {
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
+function fmtAmerican(odds) {
+  const n = parseInt(odds, 10);
+  if (isNaN(n)) return "-110";
+  return n > 0 ? `+${n}` : `${n}`;
+}
 function toggleWatch(playerId, e) {
   if (e) e.stopPropagation();
   const idStr = String(playerId);
@@ -243,7 +248,8 @@ function formatSlipForPlatform(mode) {
     if (mode === "pickem") {
       lbl = lbl.replace(/\bO\s+(\d+(\.\d+)?)/g, "MORE $1").replace(/\bU\s+(\d+(\.\d+)?)/g, "LESS $1");
     }
-    return `${i + 1}. ${lbl} (${s.prob}%)`;
+    const bookTag = s.meta?.bestBook ? ` [${s.meta.bestBook} ${fmtAmerican(s.meta.bestOdds)}]` : "";
+    return `${i + 1}. ${lbl} (${s.prob}%)${bookTag}`;
   });
 
   return [
@@ -398,6 +404,12 @@ function toggleSlipByKey(key) {
 function clearSlip() { slip = []; updateSlipUI(true); render(); }
 function loadTopParlay() { if (!topParlayLegs.length) return; slip = topParlayLegs.map(x => ({ ...x })); updateSlipUI(true); render(); }
 
+function getPickOddsAmerican(s) {
+  if (s?.meta?.bestOdds !== undefined && s?.meta?.bestOdds !== null) return fmtAmerican(s.meta.bestOdds);
+  if (s?.meta?.isAlt && s?.meta?.fairOdds) return fmtAmerican(s.meta.fairOdds);
+  return "-110";
+}
+
 function updateSlipUI(recalcDefaultOdds = true) {
   const has = slip.length > 0;
   document.body.classList.toggle("has-slip", has);
@@ -406,11 +418,11 @@ function updateSlipUI(recalcDefaultOdds = true) {
   const oddsEl = document.getElementById("bookOddsInput");
   if (recalcDefaultOdds) {
     if (slip.length === 1) {
-      oddsEl.value = slip[0].meta?.fairOdds && slip[0].meta.isAlt ? slip[0].meta.fairOdds : "-110";
+      oddsEl.value = getPickOddsAmerican(slip[0]);
     } else {
       let decParlay = 1.0;
       slip.forEach(s => {
-        decParlay *= (s.meta?.isAlt && s.meta?.fairOdds) ? americanToDecimal(s.meta.fairOdds) : 1.909;
+        decParlay *= americanToDecimal(getPickOddsAmerican(s));
       });
       oddsEl.value = `+${Math.round((decParlay - 1) * 100)}`;
     }
@@ -442,7 +454,10 @@ function updateSlipUI(recalcDefaultOdds = true) {
   const estPayout = +(stake * decOdds).toFixed(2);
   document.getElementById("slipCount").textContent = slip.length;
   document.getElementById("slipPayout").textContent = `→ $${estPayout}`;
-  document.getElementById("slipChips").innerHTML = slip.map(s => `<div class="s-chip">${escHtml(s.label)} (${s.prob}%) <span data-key="${escHtml(s.key)}" onclick="toggleSlipByKey(this.dataset.key)">×</span></div>`).join("");
+  document.getElementById("slipChips").innerHTML = slip.map(s => {
+    const oddsTag = s.meta?.bestOdds ? ` ${fmtAmerican(s.meta.bestOdds)}` : "";
+    return `<div class="s-chip">${escHtml(s.label)} (${s.prob}%${oddsTag}) <span data-key="${escHtml(s.key)}" onclick="toggleSlipByKey(this.dataset.key)">×</span></div>`;
+  }).join("");
 }
 
 function saveTrackedBet() {
@@ -476,20 +491,25 @@ function buildEvBoard() {
   for (const p of nbaPlayers) {
     const pidStr = String(p.id);
     for (const m of (p.all_props || [])) {
-      const { evPct, qKellyPct } = calcEvAndQuarterKelly(m.prob, 1.909);
+      const bestOdds = m.best_odds !== undefined && m.best_odds !== null ? m.best_odds : -110;
+      const decOdds = americanToDecimal(bestOdds);
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(m.prob, decOdds);
       if (evPct >= 3.0) {
         const side = m.side || "O";
         const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
         const meta = {
           sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
-          stat: m.stat, side, line: m.line, isAlt: false, fairOdds: m.fair_odds, marketKey: m.market
+          stat: m.stat, side, line: m.line, isAlt: false, fairOdds: m.fair_odds, marketKey: m.market,
+          bestBook: m.best_book || "", bestOdds, noVigOdds: m.no_vig_odds || null, noVigProb: m.no_vig_prob || null
         };
         registerPick(k, `${p.player} ${m.market}`, m.prob, meta);
+        const bookSnippet = m.best_book ? ` • Best: ${m.best_book} ${fmtAmerican(bestOdds)}` : "";
+        const nvSnippet = m.no_vig_odds ? ` • No-Vig: ${fmtAmerican(m.no_vig_odds)}` : "";
         items.push({
           key: k, category: "PROPS", badge: "🔥 NBA PROP",
           title: `${p.player} ${m.market}`,
-          subtitle: `${p.team} vs ${p.opponent} • Sim: ${m.proj} • L10: ${m.hit_str || "N/A"}`,
-          tags: p.tags || [], prob: m.prob, evPct, qKellyPct, dots: m.dots || "", gameId: p.game_id
+          subtitle: `${p.team} vs ${p.opponent} • Sim: ${m.proj}${bookSnippet}${nvSnippet}`,
+          tags: p.tags || [], prob: m.prob, evPct, qKellyPct, bestBook: m.best_book || "Consensus", bestOdds, noVigOdds: m.no_vig_odds || null, dots: m.dots || "", gameId: p.game_id
         });
       }
     }
@@ -499,30 +519,38 @@ function buildEvBoard() {
     const awayLbl = g.away_abbr || g.away_short;
     const homeLbl = g.home_abbr || g.home_short;
     if (g.has_line) {
-      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
+      const bestOdds = g.best_odds !== undefined && g.best_odds !== null ? g.best_odds : -110;
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, americanToDecimal(bestOdds));
       if (evPct >= 3.0) {
         const k = `nbagame-${g.id}-ats`;
-        const meta = { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        const meta = { sport: "nbagame", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick, bestBook: g.best_book || "", bestOdds, noVigOdds: g.no_vig_odds || null };
         registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
+        const bookSnippet = g.best_book ? ` • Best: ${g.best_book} ${fmtAmerican(bestOdds)}` : "";
+        const nvSnippet = g.no_vig_odds ? ` • No-Vig: ${fmtAmerican(g.no_vig_odds)}` : "";
         items.push({
           key: k, category: "NBAGAMES", badge: "🏀 NBA SPREAD",
           title: g.spread_pick,
-          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
-          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+          subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj})${bookSnippet}${nvSnippet}`,
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, bestBook: g.best_book || "Consensus", bestOdds, noVigOdds: g.no_vig_odds || null, dots: "", gameId: g.id
         });
       }
     }
     if (g.has_total) {
-      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
+      const bestOdds = g.total_best_odds !== undefined && g.total_best_odds !== null ? g.total_best_odds : -110;
+      const bestBook = g.total_best_book || g.best_book || "";
+      const nvOdds = g.total_no_vig_odds || g.no_vig_odds || null;
+      const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, americanToDecimal(bestOdds));
       if (evPct >= 3.0) {
         const k = `nbagame-${g.id}-tot`;
-        const meta = { sport: "nbagame", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        const meta = { sport: "nbagame", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under, bestBook, bestOdds, noVigOdds: nvOdds };
         registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
+        const bookSnippet = bestBook ? ` • Best: ${bestBook} ${fmtAmerican(bestOdds)}` : "";
+        const nvSnippet = nvOdds ? ` • No-Vig: ${fmtAmerican(nvOdds)}` : "";
         items.push({
           key: k, category: "NBAGAMES", badge: "🏀 NBA TOTAL",
           title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
-          subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
-          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+          subtitle: `Sim: ${g.total_proj} vs O/U ${g.over_under}${bookSnippet}${nvSnippet}`,
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, bestBook: bestBook || "Consensus", bestOdds, noVigOdds: nvOdds, dots: "", gameId: g.id
         });
       }
     }
@@ -536,13 +564,13 @@ function buildEvBoard() {
       const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.spread_cover_pct, 1.909);
       if (evPct >= 3.0) {
         const k = `ncaa-${g.id}-ats`;
-        const meta = { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick };
+        const meta = { sport: "ncaa", betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick, bestOdds: -110 };
         registerPick(k, g.spread_pick, g.spread_cover_pct, meta);
         items.push({
           key: k, category: "NCAA", badge: "🏀 NCAA ATS",
           title: g.spread_pick,
           subtitle: `${awayLbl} (${g.away_proj}) @ ${homeLbl} (${g.home_proj}) • +${g.edge_pts} pt edge`,
-          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+          tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, bestBook: "Consensus", bestOdds: -110, noVigOdds: null, dots: "", gameId: g.id
         });
       }
     }
@@ -550,13 +578,13 @@ function buildEvBoard() {
       const { evPct, qKellyPct } = calcEvAndQuarterKelly(g.total_cover_pct, 1.909);
       if (evPct >= 3.0) {
         const k = `ncaa-${g.id}-tot`;
-        const meta = { sport: "ncaa", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under };
+        const meta = { sport: "ncaa", betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under, bestOdds: -110 };
         registerPick(k, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, meta);
         items.push({
           key: k, category: "NCAA", badge: "🏀 NCAA TOTAL",
           title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
           subtitle: `Sim Total: ${g.total_proj} vs O/U ${g.over_under} (+${g.total_edge_pts} edge)`,
-          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, dots: "", gameId: g.id
+          tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, bestBook: "Consensus", bestOdds: -110, noVigOdds: null, dots: "", gameId: g.id
         });
       }
     }
@@ -796,20 +824,25 @@ function renderGameCards(gamesList, prefix, sportTag, activeSubFilter, q, filter
     const awayLbl = g.away_abbr || g.away_short;
     const homeLbl = g.home_abbr || g.home_short;
     const atsKey = `${prefix}-${g.id}-ats`, totKey = `${prefix}-${g.id}-tot`, mlKey = `${prefix}-${g.id}-ml`;
-    if (g.has_line) registerPick(atsKey, g.spread_pick, g.spread_cover_pct, { sport: sportTag, betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick });
-    if (g.has_total) registerPick(totKey, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, { sport: sportTag, betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under });
+    const spOdds = g.best_odds !== undefined && g.best_odds !== null ? g.best_odds : -110;
+    const totOdds = g.total_best_odds !== undefined && g.total_best_odds !== null ? g.total_best_odds : -110;
+    const totBook = g.total_best_book || g.best_book || "";
+
+    if (g.has_line) registerPick(atsKey, g.spread_pick, g.spread_cover_pct, { sport: sportTag, betType: "ats", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, pickText: g.spread_pick, bestBook: g.best_book || "", bestOdds: spOdds, noVigOdds: g.no_vig_odds || null });
+    if (g.has_total) registerPick(totKey, `${awayLbl}/${homeLbl} ${g.total_pick}`, g.total_cover_pct, { sport: sportTag, betType: "total", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, side: (g.total_pick || "").startsWith("U") ? "U" : "O", line: g.over_under, bestBook: totBook, bestOdds: totOdds, noVigOdds: g.total_no_vig_odds || null });
     registerPick(mlKey, `${g.favored_team} ML`, g.favored_prob, { sport: sportTag, betType: "ml", gameId: g.id, awayShort: awayLbl, homeShort: homeLbl, favoredTeam: g.favored_team });
 
     const atsSel = slip.some(s => s.key === atsKey), totSel = slip.some(s => s.key === totKey), mlSel = slip.some(s => s.key === mlKey);
     const simTotal = g.total_proj || +(g.away_proj + g.home_proj).toFixed(1);
     const moveTags = (g.move_badges || []).map(b => `<span class="s-tag ${b.includes("B2B") ? "" : "cyan"}">${escHtml(b)}</span>`).join("");
+    const bookTag = g.best_book ? `<span class="s-tag gold">Best: ${escHtml(g.best_book)} ${fmtAmerican(spOdds)}${g.no_vig_odds ? ` • NV ${fmtAmerican(g.no_vig_odds)}` : ""}</span>` : "";
 
     return `<article class="card ${(atsSel || totSel || mlSel) ? "in-slip" : ""}">
       <div class="c-head">
         <div>
           <div class="c-name">${escHtml(awayLbl)} @ ${escHtml(homeLbl)}</div>
           <div class="c-meta">${escHtml(g.tipoff || "")} • ${escHtml(g.market_line || "PK")}${g.has_total ? ` • O/U ${g.over_under}` : ""}${g.exp_pace ? ` • Pace ${g.exp_pace}` : ""}</div>
-          ${moveTags ? `<div class="sharp-tags">${moveTags}</div>` : ""}
+          ${(moveTags || bookTag) ? `<div class="sharp-tags">${bookTag}${moveTags}</div>` : ""}
         </div>
         ${g.has_line ? `<span class="edge-tag">+${g.edge_pts} ATS</span>` : ""}
       </div>
@@ -853,12 +886,14 @@ function render() {
       const sel = slip.some(s => s.key === item.key);
       const kellyDollar = Math.max(1, Math.round(bankroll * (item.qKellyPct / 100)));
       const tagsHtml = (item.tags || []).slice(0, 3).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+      const oddsLbl = `+EV (${fmtAmerican(item.bestOdds)})`;
 
       return `<article class="card ${sel ? "in-slip" : ""}">
         <div class="c-head">
           <div>
-            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px; flex-wrap:wrap;">
               <span class="s-tag gold">#${idx + 1} ${escHtml(item.badge)}</span>
+              ${item.bestBook ? `<span class="s-tag cyan">${escHtml(item.bestBook)} ${fmtAmerican(item.bestOdds)}</span>` : ""}
             </div>
             <div class="c-name">${escHtml(item.title)}</div>
             <div class="c-meta">${escHtml(item.subtitle)}</div>
@@ -871,7 +906,7 @@ function render() {
         ${item.dots ? `<div class="streak-bar"><span>Last-10 Hit Form</span>${renderDots(item.dots)}</div>` : ""}
         <div class="ev-metrics">
           <div><div class="ev-m-lbl">Sim Win %</div><div class="ev-m-val" style="color:#fff;">${item.prob}%</div></div>
-          <div><div class="ev-m-lbl">+EV (-110)</div><div class="ev-m-val" style="color:var(--emerald);">+${item.evPct}%</div></div>
+          <div><div class="ev-m-lbl">${escHtml(oddsLbl)}</div><div class="ev-m-val" style="color:var(--emerald);">+${item.evPct}%</div></div>
           <div><div class="ev-m-lbl">1/4 Kelly</div><div class="ev-m-val" style="color:var(--cyan);">$${kellyDollar} (${item.qKellyPct}%)</div></div>
         </div>
       </article>`;
@@ -929,20 +964,24 @@ function render() {
           ${pool.map(m => {
             const side = m.side || "O";
             const isAlt = Boolean(m.is_alt || subFilter === "ALTS");
+            const bestOdds = m.best_odds !== undefined && m.best_odds !== null ? m.best_odds : (isAlt && m.fair_odds ? m.fair_odds : -110);
             const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
             registerPick(k, `${p.player} ${m.market}`, m.prob, {
               sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
-              stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market
+              stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market,
+              bestBook: m.best_book || "", bestOdds, noVigOdds: m.no_vig_odds || null
             });
             const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
+            const bookSub = m.best_book ? ` • ${m.best_book} ${fmtAmerican(bestOdds)}` : (isAlt && m.fair_odds ? ` • ${m.fair_odds}` : "");
+            const nvSub = m.no_vig_odds ? `NV ${fmtAmerican(m.no_vig_odds)}` : (m.hit_str || "");
             return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""} ${isAlt ? "alt-btn" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)">
               <div>
                 <span>${escHtml(m.market)}</span>
-                <span class="sim-hint">Sim: ${m.proj}${isAlt && m.fair_odds ? ` • ${m.fair_odds}` : ""}</span>
+                <span class="sim-hint">Sim: ${m.proj}${escHtml(bookSub)}</span>
               </div>
               <div class="prob-val">
                 <span>${m.prob}%</span>
-                ${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}
+                ${nvSub ? `<span class="hit-mini">${escHtml(nvSub)}</span>` : ""}
               </div>
             </button>`;
           }).join("")}
