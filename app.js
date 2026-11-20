@@ -839,8 +839,161 @@ function render() {
       if (evFilter === "MAX" && item.evPct < 15.0) return false;
       if (evFilter === "PROPS" && item.category !== "PROPS") return false;
       if (evFilter === "NBAGAMES" && item.category !== "NBAGAMES") return false;
-      if (evFilter === "NCAA" && item.
-} catch (e) {
+      if (evFilter === "NCAA" && item.category !== "NCAA") return false;
+      if (filter === "edge" && item.evPct < 12.0) return false;
+      if (filter === "slip" && !slip.some(s => s.key === item.key)) return false;
+      return true;
+    });
+
+    const slice = filtered.slice(0, visibleLimit);
+    moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+    moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+
+    listEl.innerHTML = slice.map((item, idx) => {
+      const sel = slip.some(s => s.key === item.key);
+      const kellyDollar = Math.max(1, Math.round(bankroll * (item.qKellyPct / 100)));
+      const tagsHtml = (item.tags || []).slice(0, 3).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      return `<article class="card ${sel ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
+              <span class="s-tag gold">#${idx + 1} ${escHtml(item.badge)}</span>
+            </div>
+            <div class="c-name">${escHtml(item.title)}</div>
+            <div class="c-meta">${escHtml(item.subtitle)}</div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <button class="btn-quick-parlay" style="${sel ? "background:var(--cyan); color:#03131f;" : ""}" data-key="${escHtml(item.key)}" onclick="toggleSlipByKey(this.dataset.key)">
+            ${sel ? "✓ In Slip" : "+ Add"}
+          </button>
+        </div>
+        ${item.dots ? `<div class="streak-bar"><span>Last-10 Hit Form</span>${renderDots(item.dots)}</div>` : ""}
+        <div class="ev-metrics">
+          <div><div class="ev-m-lbl">Sim Win %</div><div class="ev-m-val" style="color:#fff;">${item.prob}%</div></div>
+          <div><div class="ev-m-lbl">+EV (-110)</div><div class="ev-m-val" style="color:var(--emerald);">+${item.evPct}%</div></div>
+          <div><div class="ev-m-lbl">1/4 Kelly</div><div class="ev-m-val" style="color:var(--cyan);">$${kellyDollar} (${item.qKellyPct}%)</div></div>
+        </div>
+      </article>`;
+    }).join("");
+    return;
+  }
+
+  if (activeSport === "nba") {
+    const sorted = [...nbaPlayers].sort((a, b) => {
+      if (subFilter === "ALTS") return ((b.alt_props?.[0]?.prob || 0) - (a.alt_props?.[0]?.prob || 0));
+      if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) return (b.all_props?.find(x => x.stat === subFilter)?.prob || 0) - (a.all_props?.find(x => x.stat === subFilter)?.prob || 0);
+      return (b.best_prop?.prob || 0) - (a.best_prop?.prob || 0);
+    });
+    const filtered = sorted.filter(p => {
+      if (q && !p.player.toLowerCase().includes(q) && !p.team.toLowerCase().includes(q) && !p.opponent.toLowerCase().includes(q)) return false;
+      if (subFilter === "WATCH" && !watchlist.includes(String(p.id))) return false;
+      if (subFilter === "UNDERS" && !p.has_under && !(p.all_props || []).some(x => x.side === "U")) return false;
+      if (subFilter === "ALTS" && (!p.alt_props || p.alt_props.length === 0)) return false;
+      if (subFilter === "USG" && (p.usage_bump_pct || 0) <= 0) return false;
+      if (subFilter === "HOT" && (p.best_prop?.hits || 0) < 8) return false;
+      if (filter === "edge" && (p.best_prop?.prob || 0) < 58 && (p.usage_bump_pct || 0) <= 0) return false;
+      if (filter === "slip" && !slip.some(s => s.key.startsWith(`nba-${p.id}`))) return false;
+      return true;
+    });
+    const slice = filtered.slice(0, visibleLimit);
+    moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
+    moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
+    listEl.innerHTML = slice.map(p => {
+      const pidStr = String(p.id);
+      const isWatched = watchlist.includes(pidStr);
+      const inSlip = slip.some(s => s.key.startsWith(`nba-${pidStr}`));
+
+      let pool = p.all_props || [];
+      if (subFilter === "ALTS") pool = p.alt_props || [];
+      else if (subFilter === "UNDERS") pool = (p.all_props || []).filter(m => m.side === "U");
+      else if (["PTS", "REB", "AST", "PRA"].includes(subFilter)) pool = (p.all_props || []).filter(m => m.stat === subFilter);
+
+      const selectedKey = activePropByPlayer[pidStr];
+      const focusProp = (selectedKey && [...(p.all_props || []), ...(p.alt_props || [])].find(x => (x.market || x.stat) === selectedKey || x.stat === selectedKey)) || pool[0] || p.best_prop || {};
+      const tagsHtml = (p.tags || []).map(t => `<span class="s-tag ${t.includes("DEF") || t.includes("B2B") || t.includes("UNDER") ? "cyan" : ""}">${escHtml(t)}</span>`).join("");
+
+      return `<article class="card ${inSlip ? "in-slip" : ""}">
+        <div class="c-head">
+          <div>
+            <div class="c-name">${escHtml(p.player)} <span class="c-meta">• ${escHtml(p.team)} vs ${escHtml(p.opponent)} (${p.avg_min}m)</span></div>
+            ${tagsHtml ? `<div class="sharp-tags">${tagsHtml}</div>` : ""}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="c-meta">O/U ${p.game_total}</span>
+            <button class="btn-sm" style="padding:2px 6px; font-size:0.75rem; border-color:${isWatched ? "var(--orange)" : "var(--border)"}; color:${isWatched ? "var(--orange)" : "var(--muted)"};" onclick="toggleWatch('${escHtml(pidStr)}', event)">${isWatched ? "★" : "☆"}</button>
+          </div>
+        </div>
+        ${focusProp.dots ? `<div class="streak-bar"><span><strong>${escHtml(focusProp.market)}</strong> Recent Form: <strong style="color:var(--emerald);">${escHtml(focusProp.hit_str)}</strong></span>${renderDots(focusProp.dots)}</div>` : ""}
+        <div class="prop-grid" style="${pool.length === 1 ? "grid-template-columns:1fr;" : ""}">
+          ${pool.map(m => {
+            const side = m.side || "O";
+            const isAlt = Boolean(m.is_alt || subFilter === "ALTS");
+            const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
+            registerPick(k, `${p.player} ${m.market}`, m.prob, {
+              sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+              stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market
+            });
+            const sel = slip.some(s => s.key === k), hot = m.prob >= 60;
+            return `<button class="p-btn ${sel ? "selected" : ""} ${hot ? "hot" : ""} ${isAlt ? "alt-btn" : ""}" data-key="${escHtml(k)}" onclick="toggleSlipByKey(this.dataset.key)">
+              <div>
+                <span>${escHtml(m.market)}</span>
+                <span class="sim-hint">Sim: ${m.proj}${isAlt && m.fair_odds ? ` • ${m.fair_odds}` : ""}</span>
+              </div>
+              <div class="prob-val">
+                <span>${m.prob}%</span>
+                ${m.hit_str ? `<span class="hit-mini">${escHtml(m.hit_str)}</span>` : ""}
+              </div>
+            </button>`;
+          }).join("")}
+        </div>
+      </article>`;
+    }).join("");
+  } else if (activeSport === "nbagames") {
+    renderGameCards(nbaGames, "nbagame", "nbagame", nbaGamesFilter, q, filter, listEl, moreBtn);
+  } else {
+    renderGameCards(ncaaGames, "ncaa", "ncaa", ncaaFilter, q, filter, listEl, moreBtn);
+  }
+}
+
+async function loadAllData(force = false) {
+  const savedBr = localStorage.getItem(BANKROLL_KEY);
+  if (savedBr && document.getElementById("bankrollInput")) document.getElementById("bankrollInput").value = savedBr;
+
+  const savedBk = localStorage.getItem(BOOK_KEY);
+  if (savedBk && document.getElementById("sportsbookSelect")) document.getElementById("sportsbookSelect").value = savedBk;
+
+  const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
+  document.getElementById("syncText").textContent = "Syncing...";
+  document.getElementById("betsCount").textContent = trackedBets.length;
+
+  const openBetsTab = new URLSearchParams(window.location.search).get("tab") === "bets";
+  if (openBetsTab) switchSport("bets");
+  else if (trackedBets.some(b => b.pinned && b.status !== "won" && b.status !== "lost")) {
+    refreshTrackedBets();
+    startLivePoller();
+  }
+
+  try {
+    const [ncaaRes, nbaRes, nbaGamesRes] = await Promise.allSettled([
+      fetch(NCAA_JSON_URL + bust),
+      fetch(NBA_JSON_URL + bust),
+      fetch(NBA_GAMES_JSON_URL + bust)
+    ]);
+    if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) ncaaGames = await ncaaRes.value.json();
+    if (nbaRes.status === "fulfilled" && nbaRes.value.ok) nbaPlayers = await nbaRes.value.json();
+    if (nbaGamesRes.status === "fulfilled" && nbaGamesRes.value.ok) nbaGames = await nbaGamesRes.value.json();
+
+    document.getElementById("ncaaCount").textContent = ncaaGames.length;
+    document.getElementById("nbaCount").textContent = nbaPlayers.length;
+    document.getElementById("nbaGamesCount").textContent = nbaGames.length;
+    const ts = nbaGames[0]?.generated_at || ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
+    document.getElementById("syncText").textContent = `Synced • ${ts}`;
+
+    buildEvBoard();
+    buildTopParlay();
+    if (!openBetsTab) render();
+  } catch (e) {
     document.getElementById("syncText").textContent = "Offline cache";
   }
 }
