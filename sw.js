@@ -1,4 +1,4 @@
-const CACHE_NAME = "simlab-v16";
+const CACHE_NAME = "simlab-v17";
 const ASSETS = ["./", "./index.html", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -29,9 +29,12 @@ self.addEventListener("notificationclick", (e) => {
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if ("focus" in client) return client.focus();
+        if ("focus" in client) {
+          client.postMessage({ type: "OPEN_BETS_TAB" });
+          return client.focus();
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow("./");
+      if (self.clients.openWindow) return self.clients.openWindow("./?tab=bets");
     })
   );
 });
