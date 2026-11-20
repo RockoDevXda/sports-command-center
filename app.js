@@ -840,3 +840,9 @@ function render() {
       if (evFilter === "PROPS" && item.category !== "PROPS") return false;
       if (evFilter === "NBAGAMES" && item.category !== "NBAGAMES") return false;
       if (evFilter === "NCAA" && item.
+} catch (e) {
+    document.getElementById("syncText").textContent = "Offline cache";
+  }
+}
+
+loadAllData();
