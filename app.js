@@ -1263,5 +1263,18 @@ async function loadAllData(force = false) {
     document.getElementById("syncText").textContent = "Offline cache";
   }
 }
-
+function formatEasternTimestamp(rawTs) {
+  if (!rawTs || rawTs === "Live") return "Live (ET)";
+  const cleaned = String(rawTs).replace(/\s*UTC$/i, "").trim();
+  const parsed = new Date(`${cleaned}, ${new Date().getUTCFullYear()} UTC`);
+  if (isNaN(parsed.getTime())) return `${rawTs} ET`;
+  return parsed.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }) + " ET";
+}
 loadAllData();
