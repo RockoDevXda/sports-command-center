@@ -465,12 +465,15 @@ function saveTrackedBet() {
   const stake = Math.max(1, parseFloat(document.getElementById("stakeInput").value) || 25);
   const decOdds = americanToDecimal(document.getElementById("bookOddsInput").value);
   const payout = +(stake * decOdds).toFixed(2);
-  const todayIso = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const todayIso = new Date().toLocaleDateString("en-CA").replace(/-/g, "");
   trackedBets.unshift({
     id: "bet-" + Date.now(),
     createdAt: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
     dateStr: todayIso, stake, payout, status: "pending", pinned: false,
-    legs: slip.map(s => ({ key: s.key, label: s.label, prob: s.prob, meta: s.meta || {}, status: "pending", liveScore: "Scheduled", currentVal: 0, targetVal: s.meta?.line || 0, clock: "" }))
+    legs: slip.map(s => ({
+      key: s.key, label: s.label, prob: s.prob, meta: s.meta || {},
+      status: "pending", liveScore: "Scheduled", currentVal: 0, targetVal: parseFloat(s.meta?.line) || 0, clock: ""
+    }))
   });
   persistBets();
   slip = [];
@@ -499,6 +502,7 @@ function buildEvBoard() {
         const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
         const meta = {
           sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+          awayShort: p.opponent, homeShort: p.team,
           stat: m.stat, side, line: m.line, isAlt: false, fairOdds: m.fair_odds, marketKey: m.market,
           bestBook: m.best_book || "", bestOdds, noVigOdds: m.no_vig_odds || null, noVigProb: m.no_vig_prob || null
         };
@@ -614,65 +618,141 @@ function buildTopParlay() {
   document.getElementById("heroParlaySub").textContent = `${legs.map(l => l.label).join(" • ")} (${pct}% | ${probToAmerican(pct)})`;
 }
 
+function getDateWindowStrings(extraDateStr = "") {
+  const out = new Set();
+  const now = new Date();
+  for (const offsetDays of [-1, 0, 1]) {
+    const d = new Date(now.getTime() + offsetDays * 86400000);
+    out.add(d.toISOString().slice(0, 10).replace(/-/g, ""));
+    out.add(d.toLocaleDateString("en-CA").replace(/-/g, ""));
+  }
+  if (extraDateStr) out.add(String(extraDateStr).replace(/-/g, ""));
+  return Array.from(out);
+}
+
+function findMatchingEvent(eventsMap, gid, awayShort, homeShort) {
+  if (gid && eventsMap[gid]) return eventsMap[gid];
+  const aUp = (awayShort || "").toUpperCase();
+  const hUp = (homeShort || "").toUpperCase();
+  if (!aUp && !hUp) return null;
+  for (const ev of Object.values(eventsMap)) {
+    const comp = ev.competitions?.[0];
+    const awayAbbr = (comp?.competitors?.find(c => c.homeAway === "away")?.team?.abbreviation || "").toUpperCase();
+    const homeAbbr = (comp?.competitors?.find(c => c.homeAway === "home")?.team?.abbreviation || "").toUpperCase();
+    if ((aUp && awayAbbr === aUp) || (hUp && homeAbbr === hUp)) return ev;
+  }
+  return null;
+}
+
 async function refreshTrackedBets() {
   const statusEl = document.getElementById("livePollStatus");
   if (statusEl) statusEl.textContent = "Fetching live ESPN scores & box scores...";
-  const datesToFetch = new Set([new Date().toISOString().slice(0, 10).replace(/-/g, "")]);
-  trackedBets.forEach(b => { if (b.dateStr) datesToFetch.add(b.dateStr); });
+  const datesToFetch = new Set(getDateWindowStrings());
+  trackedBets.forEach(b => {
+    if (b.dateStr) getDateWindowStrings(b.dateStr).forEach(ds => datesToFetch.add(ds));
+  });
+
   const nbaEvents = {}, ncaaEvents = {}, nbaBoxCache = {};
   try {
     for (const d of datesToFetch) {
       const [nbaRes, ncaaRes] = await Promise.allSettled([
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${d}`),
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${d}&limit=100`),
         fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${d}&groups=50&limit=200`)
       ]);
-      if (nbaRes.status === "fulfilled" && nbaRes.value.ok) ((await nbaRes.value.json()).events || []).forEach(ev => { nbaEvents[String(ev.id)] = ev; });
-      if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) ((await ncaaRes.value.json()).events || []).forEach(ev => { ncaaEvents[String(ev.id)] = ev; });
+      if (nbaRes.status === "fulfilled" && nbaRes.value.ok) {
+        ((await nbaRes.value.json()).events || []).forEach(ev => { nbaEvents[String(ev.id)] = ev; });
+      }
+      if (ncaaRes.status === "fulfilled" && ncaaRes.value.ok) {
+        ((await ncaaRes.value.json()).events || []).forEach(ev => { ncaaEvents[String(ev.id)] = ev; });
+      }
     }
+
     for (const bet of trackedBets) {
       for (const leg of bet.legs) {
-        const m = leg.meta || {}, gid = String(m.gameId || "");
-        if (m.sport === "nba" && gid && nbaEvents[gid]) {
-          const ev = nbaEvents[gid], state = ev.status?.type?.state || "pre", detail = ev.status?.type?.shortDetail || "";
-          const comp = ev.competitions?.[0], away = comp?.competitors?.find(c => c.homeAway === "away"), home = comp?.competitors?.find(c => c.homeAway === "home");
-          leg.clock = `${away?.team?.abbreviation || ""} ${away?.score || 0} - ${home?.team?.abbreviation || ""} ${home?.score || 0} • ${detail}`;
+        const m = leg.meta || {};
+        const gid = String(m.gameId || "");
+        const targetLine = parseFloat(m.line) || 0;
+        leg.targetVal = targetLine;
+
+        if (m.sport === "nba") {
+          const ev = findMatchingEvent(nbaEvents, gid, m.awayShort, m.homeShort);
+          if (!ev) {
+            if (!leg.liveScore || leg.liveScore === "Scheduled") leg.liveScore = `0 / ${targetLine || ""} ${m.stat || ""}`.trim();
+            continue;
+          }
+          const evId = String(ev.id);
+          const state = ev.status?.type?.state || "pre";
+          const detail = ev.status?.type?.shortDetail || "";
+          const comp = ev.competitions?.[0];
+          const away = comp?.competitors?.find(c => c.homeAway === "away");
+          const home = comp?.competitors?.find(c => c.homeAway === "home");
+          leg.clock = `${away?.team?.abbreviation || ""} ${away?.score || 0} - ${home?.team?.abbreviation || ""} ${home?.score || 0}${detail ? ` • ${detail}` : ""}`;
           const isUnder = m.side === "U";
-          if (state === "pre") { leg.status = "pending"; leg.liveScore = `0 / ${m.line} ${m.stat}`; }
-          else {
-            if (!nbaBoxCache[gid]) { try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gid}`); if (r.ok) nbaBoxCache[gid] = await r.json(); } catch (e) {} }
-            const val = extractNbaPlayerStat(nbaBoxCache[gid], String(m.playerId || ""), m.playerName, m.stat);
-            leg.currentVal = val; leg.targetVal = m.line; leg.liveScore = `${val} / ${m.line} ${m.stat}`;
+
+          if (state === "pre") {
+            leg.status = "pending";
+            leg.currentVal = 0;
+            leg.liveScore = `0 / ${targetLine} ${m.stat || "PTS"}`;
+          } else {
+            if (!nbaBoxCache[evId]) {
+              try {
+                const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${evId}`);
+                if (r.ok) nbaBoxCache[evId] = await r.json();
+              } catch (e) {}
+            }
+            const val = extractNbaPlayerStat(nbaBoxCache[evId], String(m.playerId || ""), m.playerName, m.stat || "PTS");
+            leg.currentVal = val;
+            leg.liveScore = `${val} / ${targetLine} ${m.stat || "PTS"}`;
             if (isUnder) {
-              if (val > m.line) leg.status = "miss";
+              if (val > targetLine) leg.status = "miss";
               else leg.status = state === "post" ? "hit" : "live";
             } else {
-              leg.status = state === "post" ? (val > m.line ? "hit" : "miss") : (val > m.line ? "hit" : "live");
+              leg.status = state === "post" ? (val > targetLine ? "hit" : "miss") : (val > targetLine ? "hit" : "live");
             }
           }
-        } else if ((m.sport === "ncaa" || m.sport === "nbagame") && gid) {
-          const ev = m.sport === "nbagame" ? nbaEvents[gid] : ncaaEvents[gid];
+        } else if (m.sport === "ncaa" || m.sport === "nbagame") {
+          const pool = m.sport === "nbagame" ? nbaEvents : ncaaEvents;
+          const ev = findMatchingEvent(pool, gid, m.awayShort, m.homeShort);
           if (!ev) continue;
-          const state = ev.status?.type?.state || "pre", detail = ev.status?.type?.shortDetail || "";
-          const comp = ev.competitions?.[0], away = comp?.competitors?.find(c => c.homeAway === "away"), home = comp?.competitors?.find(c => c.homeAway === "home");
-          const aS = parseFloat(away?.score || 0), hS = parseFloat(home?.score || 0);
-          const sStr = `${m.awayShort || away?.team?.abbreviation} ${aS} - ${m.homeShort || home?.team?.abbreviation} ${hS}`;
+          const state = ev.status?.type?.state || "pre";
+          const detail = ev.status?.type?.shortDetail || "";
+          const comp = ev.competitions?.[0];
+          const away = comp?.competitors?.find(c => c.homeAway === "away");
+          const home = comp?.competitors?.find(c => c.homeAway === "home");
+          const aS = parseFloat(away?.score || 0);
+          const hS = parseFloat(home?.score || 0);
+          const sStr = `${m.awayShort || away?.team?.abbreviation || "AWY"} ${aS} - ${m.homeShort || home?.team?.abbreviation || "HOM"} ${hS}`;
           leg.clock = detail;
-          if (state === "pre") { leg.status = "pending"; leg.liveScore = "Tipoff scheduled"; }
-          else if (m.betType === "total") {
-            const comb = aS + hS; leg.currentVal = comb; leg.targetVal = m.line; leg.liveScore = `${sStr} (Tot: ${comb} vs ${m.line})`;
-            leg.status = state === "post" ? ((m.side === "O" ? comb > m.line : comb < m.line) ? "hit" : "miss") : "live";
+
+          if (state === "pre") {
+            leg.status = "pending";
+            leg.currentVal = 0;
+            leg.liveScore = "Tipoff scheduled";
+          } else if (m.betType === "total") {
+            const comb = aS + hS;
+            leg.currentVal = comb;
+            leg.targetVal = targetLine;
+            leg.liveScore = `${sStr} (Tot: ${comb} vs ${targetLine})`;
+            leg.status = state === "post" ? ((m.side === "O" ? comb > targetLine : comb < targetLine) ? "hit" : "miss") : "live";
           } else if (m.betType === "ml") {
+            leg.currentVal = Math.max(aS, hS);
+            leg.targetVal = Math.max(aS, hS) || 1;
             leg.liveScore = sStr;
             const lead = (m.favoredTeam === m.homeShort) ? hS > aS : aS > hS;
             leg.status = state === "post" ? (lead ? "hit" : "miss") : "live";
           } else if (m.betType === "ats") {
+            leg.currentVal = Math.max(aS, hS);
+            leg.targetVal = Math.max(aS, hS) || 1;
             leg.liveScore = sStr;
-            const parts = (m.pickText || "").split(" "), ln = parseFloat(parts[parts.length - 1]) || 0, tm = parts.slice(0, -1).join(" ");
+            const parts = (m.pickText || "").split(" ");
+            const ln = parseFloat(parts[parts.length - 1]) || 0;
+            const tm = parts.slice(0, -1).join(" ");
             const marg = (tm === m.homeShort) ? (hS + ln - aS) : (aS + ln - hS);
             leg.status = state === "post" ? (marg > 0 ? "hit" : "miss") : "live";
           }
         }
       }
+
       if (bet.legs.some(l => l.status === "miss")) bet.status = "lost";
       else if (bet.legs.length > 0 && bet.legs.every(l => l.status === "hit")) bet.status = "won";
       else if (bet.legs.some(l => l.status === "live" || l.status === "hit")) bet.status = "live";
@@ -686,24 +766,29 @@ async function refreshTrackedBets() {
         }
       }
     }
+
     persistBets();
     const hasPinned = trackedBets.some(b => b.pinned && b.status !== "won" && b.status !== "lost");
     if (statusEl) {
       statusEl.textContent = `Live ESPN synced at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}${hasPinned ? " • 📌 Pinned live (20s)" : ""}`;
     }
-  } catch (e) { if (statusEl) statusEl.textContent = "Live check paused (offline)"; }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = "Live check paused (offline)";
+  }
   if (activeSport === "bets") renderBetsTab();
 }
 
 function extractNbaPlayerStat(sum, pid, pname, stat) {
   if (!sum?.boxscore?.players) return 0;
+  const targetNorm = (pname || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   for (const tb of sum.boxscore.players) {
     const sg = tb.statistics?.[0];
     if (!sg) continue;
     const names = (sg.names || []).map(n => n.toUpperCase());
     const iP = names.indexOf("PTS"), iR = names.indexOf("REB"), iA = names.indexOf("AST"), i3 = names.findIndex(n => n === "3PT" || n === "3PM");
     for (const ae of (sg.athletes || [])) {
-      if ((pid && String(ae.athlete?.id) === pid) || (pname && ae.athlete?.displayName?.toLowerCase() === pname.toLowerCase())) {
+      const athNameNorm = (ae.athlete?.displayName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if ((pid && String(ae.athlete?.id) === pid) || (targetNorm && athNameNorm === targetNorm)) {
         const s = ae.stats || [], pts = parseFloat(s[iP]) || 0, reb = parseFloat(s[iR]) || 0, ast = parseFloat(s[iA]) || 0;
         const tpm = (i3 >= 0 && s[i3]) ? (parseFloat(String(s[i3]).split("-")[0]) || 0) : 0;
         if (stat === "PTS") return pts; if (stat === "REB") return reb; if (stat === "AST") return ast; if (stat === "3PM") return tpm; if (stat === "PRA") return pts + reb + ast;
@@ -747,9 +832,11 @@ function renderBetsTab() {
 
     const legsHtml = bet.legs.map(leg => {
       const icon = leg.status === "hit" ? "✅" : (leg.status === "miss" ? "❌" : (leg.status === "live" ? "⚡" : "⏳"));
-      const pct = leg.targetVal > 0 ? Math.min(100, Math.round((leg.currentVal / leg.targetVal) * 100)) : 0;
-      const showBar = leg.meta?.sport === "nba" || leg.meta?.betType === "total";
-      return `<div class="leg-row"><div class="leg-top"><span>${icon} ${escHtml(leg.label)}</span><span style="color:var(--emerald); font-size:0.7rem;">${leg.prob}%</span></div><div class="leg-sub"><span>${escHtml(leg.liveScore)}</span><span>${escHtml(leg.clock || "")}</span></div>${showBar ? `<div class="prog-track"><div class="prog-fill ${leg.status}" style="width:${pct}%"></div></div>` : ""}</div>`;
+      const cur = parseFloat(leg.currentVal) || 0;
+      const tgt = parseFloat(leg.targetVal) || 0;
+      const pct = tgt > 0 ? Math.min(100, Math.max(0, Math.round((cur / tgt) * 100))) : 0;
+      const showBar = tgt > 0 && (leg.meta?.sport === "nba" || leg.meta?.betType === "total");
+      return `<div class="leg-row"><div class="leg-top"><span>${icon} ${escHtml(leg.label)}</span><span style="color:var(--emerald); font-size:0.7rem;">${leg.prob}%</span></div><div class="leg-sub"><span>${escHtml(leg.liveScore || "Scheduled")}</span><span>${escHtml(leg.clock || "")}</span></div>${showBar ? `<div class="prog-track"><div class="prog-fill ${leg.status || "pending"}" style="width:${pct}%"></div></div>` : ""}</div>`;
     }).join("");
 
     const hedgeHtml = (canHedge && isOpen) ? `
@@ -968,6 +1055,7 @@ function render() {
             const k = `nba-${pidStr}-${m.stat}-${side}-${m.line}`;
             registerPick(k, `${p.player} ${m.market}`, m.prob, {
               sport: "nba", gameId: p.game_id, playerId: p.id, playerName: p.player,
+              awayShort: p.opponent, homeShort: p.team,
               stat: m.stat, side, line: m.line, isAlt, fairOdds: m.fair_odds, marketKey: m.market,
               bestBook: m.best_book || "", bestOdds, noVigOdds: m.no_vig_odds || null
             });
