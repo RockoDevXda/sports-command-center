@@ -1214,17 +1214,23 @@ function render() {
 
 function formatEasternTimestamp(rawTs) {
   if (!rawTs || rawTs === "Live") return "Live (ET)";
-  const cleaned = String(rawTs).replace(/\s*UTC$/i, "").trim();
-  const parsed = new Date(`${cleaned}, ${new Date().getUTCFullYear()} UTC`);
-  if (isNaN(parsed.getTime())) return `${rawTs} ET`;
-  return parsed.toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  }) + " ET";
+  const str = String(rawTs).trim();
+  const m = str.match(/^([A-Za-z]+)\s+(\d{1,2})\s+(\d{1,2}):(\d{2})\s*UTC$/i);
+  if (m) {
+    const yr = new Date().getUTCFullYear();
+    const utcDate = new Date(`${m[1]} ${m[2]}, ${yr} ${m[3].padStart(2, "0")}:${m[4]}:00 UTC`);
+    if (!isNaN(utcDate.getTime())) {
+      return utcDate.toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      }) + " ET";
+    }
+  }
+  return /\bET\b/i.test(str) ? str : `${str} ET`;
 }
 
 async function loadAllData(force = false) {
