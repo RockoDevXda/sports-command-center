@@ -347,6 +347,56 @@ function openSportsbookWithSlip() {
   }, 180);
 }
 
+function exportSlipToPhoneUrl() {
+  const payload = {
+    s: slip.map(item => ({
+      k: item.key,
+      l: item.label,
+      p: item.prob,
+      m: item.meta || {}
+    })),
+    b: trackedBets.slice(0, 10)
+  };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(encoded)}`;
+
+  triggerShareOrCopy(
+    shareUrl,
+    document.getElementById("syncPhoneBtn"),
+    "📱 Send to Phone"
+  );
+}
+
+function importFromPhoneUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("sync");
+  if (!raw) return;
+
+  try {
+    const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if (Array.isArray(decoded.s) && decoded.s.length) {
+      slip = decoded.s.map(x => ({
+        key: x.k,
+        label: x.l,
+        prob: x.p,
+        meta: x.m || {}
+      }));
+      updateSlipUI(true);
+    }
+    if (Array.isArray(decoded.b) && decoded.b.length) {
+      const existingIds = new Set(trackedBets.map(t => t.id));
+      const incoming = decoded.b.filter(t => t && t.id && !existingIds.has(t.id));
+      if (incoming.length) {
+        trackedBets = [...incoming, ...trackedBets];
+        persistBets();
+      }
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } catch (e) {
+    console.warn("Phone sync decode error:", e);
+  }
+}
+
 function switchHub(hub) {
   activeHub = hub;
   visibleLimit = 25;
@@ -1376,6 +1426,7 @@ function formatEasternTimestamp(rawTs) {
 }
 
 async function loadAllData(force = false) {
+  importFromPhoneUrl();
   const savedBr = localStorage.getItem(BANKROLL_KEY);
   if (savedBr && document.getElementById("bankrollInput")) document.getElementById("bankrollInput").value = savedBr;
 
