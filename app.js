@@ -19,7 +19,7 @@ const SPORTSBOOKS = {
   betr: { name: "Betr Picks", mode: "pickem", web: "https://betr.app/", scheme: "betr://" }
 };
 
-let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", recapFilter = "ALL", visibleLimit = 25;
+let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", recapFilter = "PROPS", visibleLimit = 25;
 let ncaaGames = [], nbaGames = [], nbaPlayers = [], evBoard = [], recapItems = [], topParlayLegs = [], slip = [], pickRegistry = {};
 let activePropByPlayer = {};
 let openHedgeMap = {};
@@ -732,10 +732,22 @@ function renderRecapTab() {
   const pct = filtered.length ? ((hits / filtered.length) * 100).toFixed(1) : "0.0";
   const netUnits = filtered.reduce((acc, x) => acc + x.unitDelta, 0);
 
+  const scopeLabel = recapFilter === "PROPS"
+    ? "🔥 NBA Props"
+    : recapFilter === "NBA"
+      ? "🏀 NBA Games"
+      : recapFilter === "NCAA"
+        ? "🏀 NCAA Games"
+        : recapFilter === "HIT"
+          ? "✅ Hits Only"
+          : recapFilter === "MISS"
+            ? "❌ Misses Only"
+            : "All Markets";
+
   const summaryHtml = `<div class="card recap-card ${netUnits >= 0 ? "hit" : "miss"}" style="grid-column:1/-1;">
     <div class="c-head">
       <div>
-        <div class="c-name">📊 Graded Model Recap • ${hits}W - ${misses}L (${pct}%)</div>
+        <div class="c-name">📊 ${escHtml(scopeLabel)} Recap • ${hits}W - ${misses}L (${pct}%)</div>
         <div class="c-meta">Green = Hit • Red = Miss • Net Flat Units: <strong style="color:${netUnits >= 0 ? "var(--emerald)" : "var(--danger)"};">${netUnits >= 0 ? "+" : ""}${netUnits.toFixed(2)}u</strong></div>
       </div>
       <span class="edge-tag" style="background:${netUnits >= 0 ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)"}; color:${netUnits >= 0 ? "#10b981" : "#ef4444"};">${netUnits >= 0 ? "+" : ""}${netUnits.toFixed(2)}u</span>
@@ -743,7 +755,7 @@ function renderRecapTab() {
   </div>`;
 
   if (!filtered.length) {
-    listEl.innerHTML = summaryHtml + `<div class="card" style="grid-column:1/-1; text-align:center; padding:20px;"><div style="font-size:0.88rem; font-weight:700;">No Finalized Games to Grade Yet</div><div style="font-size:0.74rem; color:var(--sub);">Once NBA or NCAA games finish on ESPN, green (HIT) and red (MISS) cards appear here automatically.</div></div>`;
+    listEl.innerHTML = summaryHtml + `<div class="card" style="grid-column:1/-1; text-align:center; padding:20px;"><div style="font-size:0.88rem; font-weight:700;">No Finalized ${escHtml(scopeLabel)} to Grade Yet</div><div style="font-size:0.74rem; color:var(--sub);">Switch filter chips (Props, NBA, NCAA) or check back once games finish on ESPN.</div></div>`;
     moreBtn.style.display = "none";
     return;
   }
@@ -752,21 +764,42 @@ function renderRecapTab() {
   moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
   moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
 
-  listEl.innerHTML = summaryHtml + slice.map(item => `
-    <article class="card recap-card ${item.hit ? "hit" : "miss"}">
-      <div class="c-head">
-        <div>
-          <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px; flex-wrap:wrap;">
-            <span class="s-tag ${item.hit ? "" : "cyan"}" style="background:${item.hit ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}; color:${item.hit ? "#34d399" : "#f87171"};">${item.hit ? "✅ HIT" : "❌ MISS"}</span>
-            <span class="s-tag gold">${escHtml(item.badge)}</span>
+  const groupOrder = ["PROPS", "NBA", "NCAA"];
+  const groupTitles = {
+    PROPS: "🔥 NBA Player Props",
+    NBA: "🏀 NBA Game Lines",
+    NCAA: "🏀 NCAA Game Lines"
+  };
+
+  let cardsHtml = "";
+  let lastGroup = "";
+  for (const item of slice) {
+    const grp = groupOrder.includes(item.sport) ? item.sport : "NCAA";
+    if (grp !== lastGroup) {
+      lastGroup = grp;
+      const grpItems = filtered.filter(x => x.sport === grp);
+      const grpW = grpItems.filter(x => x.hit).length;
+      const grpL = grpItems.length - grpW;
+      cardsHtml += `<div style="grid-column:1/-1; font-size:0.78rem; font-weight:800; color:var(--cyan); padding:6px 2px 0; letter-spacing:0.03em;">${escHtml(groupTitles[grp])} (${grpW}W - ${grpL}L)</div>`;
+    }
+    cardsHtml += `
+      <article class="card recap-card ${item.hit ? "hit" : "miss"}">
+        <div class="c-head">
+          <div>
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px; flex-wrap:wrap;">
+              <span class="s-tag ${item.hit ? "" : "cyan"}" style="background:${item.hit ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}; color:${item.hit ? "#34d399" : "#f87171"};">${item.hit ? "✅ HIT" : "❌ MISS"}</span>
+              <span class="s-tag gold">${escHtml(item.badge)}</span>
+            </div>
+            <div class="c-name">${escHtml(item.title)}</div>
+            <div class="c-meta">${escHtml(item.finalText)} • ${fmtAmerican(item.oddsAm)} (${item.probPct}% Sim)</div>
           </div>
-          <div class="c-name">${escHtml(item.title)}</div>
-          <div class="c-meta">${escHtml(item.finalText)} • ${fmtAmerican(item.oddsAm)} (${item.probPct}% Sim)</div>
+          <span style="font-weight:800; font-size:0.85rem; color:${item.hit ? "#10b981" : "#ef4444"};">${item.unitDelta >= 0 ? "+" : ""}${item.unitDelta.toFixed(2)}u</span>
         </div>
-        <span style="font-weight:800; font-size:0.85rem; color:${item.hit ? "#10b981" : "#ef4444"};">${item.unitDelta >= 0 ? "+" : ""}${item.unitDelta.toFixed(2)}u</span>
-      </div>
-    </article>
-  `).join("");
+      </article>
+    `;
+  }
+
+  listEl.innerHTML = summaryHtml + cardsHtml;
 }
 
 function buildTopParlay() {
