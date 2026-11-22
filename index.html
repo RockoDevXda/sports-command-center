@@ -23,27 +23,29 @@
       --purple: #a855f7;
       --pink: #ec4899;
       --danger: #ef4444;
+      --rail-w: 224px;
+      --bottom-nav-h: 62px;
     }
 
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 0 0 180px 0;
+      padding: 0 0 calc(var(--bottom-nav-h) + 28px) 0;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    body.has-slip { padding-bottom: 245px; }
+    body.has-slip { padding-bottom: calc(var(--bottom-nav-h) + 195px); }
 
     header {
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 30;
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 10px 14px;
-      background: rgba(7, 10, 15, 0.92);
+      background: rgba(7, 10, 15, 0.94);
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--border);
     }
@@ -66,35 +68,188 @@
     }
     .btn-sm:hover { border-color: var(--cyan); }
 
+    /* App Shell: Sidebar Rail + Main Content */
+    .app-shell {
+      display: flex;
+      min-height: calc(100vh - 56px);
+    }
+
+    .side-rail {
+      display: none;
+    }
+
+    .main-stage {
+      flex: 1;
+      min-width: 0;
+    }
+
     .wrap { max-width: 1180px; margin: 0 auto; padding: 12px 14px; }
 
-    .tabs-bar {
+    /* Mobile Fixed Bottom Nav Bar */
+    .bottom-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--bottom-nav-h);
+      z-index: 35;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: rgba(10, 14, 22, 0.98);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      padding: 4px 6px;
+    }
+    .b-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--sub);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .b-nav-btn .nav-ico { font-size: 1.05rem; line-height: 1; }
+    .b-nav-btn.active-ev { color: var(--gold); background: rgba(245, 158, 11, 0.12); }
+    .b-nav-btn.active-nba { color: var(--purple); background: rgba(168, 85, 247, 0.14); }
+    .b-nav-btn.active-ncaa { color: var(--orange); background: rgba(251, 146, 60, 0.14); }
+    .b-nav-btn.active-bets { color: var(--pink); background: rgba(236, 72, 153, 0.14); }
+
+    @media (min-width: 860px) {
+      body { padding-bottom: 40px; }
+      body.has-slip { padding-bottom: 185px; }
+      .bottom-nav { display: none; }
+      .side-rail {
+        display: flex;
+        flex-direction: column;
+        width: var(--rail-w);
+        flex-shrink: 0;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        padding: 14px 10px;
+        gap: 6px;
+        position: sticky;
+        top: 56px;
+        height: calc(100vh - 56px);
+      }
+      .rail-section-lbl {
+        font-size: 0.65rem;
+        font-weight: 800;
+        color: var(--muted);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 8px 10px 2px;
+      }
+      .rail-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        background: transparent;
+        color: var(--sub);
+        border: 1px solid transparent;
+        border-radius: 9px;
+        padding: 10px 11px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        cursor: pointer;
+        text-align: left;
+      }
+      .rail-btn:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
+      .rail-btn .rail-badge {
+        background: var(--card);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 7px;
+        font-size: 0.68rem;
+        font-weight: 800;
+      }
+      .rail-btn.active-ev { background: rgba(245, 158, 11, 0.15); color: var(--gold); border-color: rgba(245, 158, 11, 0.35); }
+      .rail-btn.active-nba { background: rgba(168, 85, 247, 0.16); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.35); }
+      .rail-btn.active-ncaa { background: rgba(251, 146, 60, 0.16); color: #fdba74; border-color: rgba(251, 146, 60, 0.35); }
+      .rail-btn.active-bets { background: rgba(236, 72, 153, 0.16); color: #f9a8d4; border-color: rgba(236, 72, 153, 0.35); }
+      .rail-sub-group {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding-left: 14px;
+        margin-bottom: 4px;
+      }
+      .rail-sub-btn {
+        background: transparent;
+        border: none;
+        color: var(--sub);
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 6px 10px;
+        border-radius: 7px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .rail-sub-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.03); }
+      .rail-sub-btn.active { color: var(--cyan); background: rgba(56, 189, 248, 0.12); font-weight: 800; }
+      .slip-bar { left: var(--rail-w); bottom: 0 !important; }
+    }
+
+    /* Hub Sub-Nav Bar (Top of Workspace) */
+    .hub-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .hub-title {
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .sub-tabs {
       display: flex;
       gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
       margin-bottom: 10px;
+      overflow-x: auto;
       scrollbar-width: none;
     }
-    .tabs-bar::-webkit-scrollbar { display: none; }
-    .tab {
+    .sub-tabs::-webkit-scrollbar { display: none; }
+    .sub-tab {
       flex: 1 0 auto;
-      background: var(--panel);
+      background: transparent;
       color: var(--sub);
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 8px 12px;
-      font-size: 0.78rem;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 12px;
+      font-size: 0.76rem;
       font-weight: 800;
       cursor: pointer;
       white-space: nowrap;
     }
-    .tab.active-ev { background: var(--gold); color: #090b0e; border-color: var(--gold); }
-    .tab.active-nba { background: var(--purple); color: #fff; border-color: var(--purple); }
-    .tab.active-nbagames { background: var(--cyan); color: #03131f; border-color: var(--cyan); }
-    .tab.active-ncaa { background: var(--orange); color: #090b0e; border-color: var(--orange); }
-    .tab.active-bets { background: var(--pink); color: #fff; border-color: var(--pink); }
-    .tab.active-recap { background: #38bdf8; color: #03131f; border-color: #38bdf8; }
+    .sub-tab.active {
+      background: var(--cyan);
+      color: #03131f;
+    }
+    .sub-tab.active-ncaa {
+      background: var(--orange);
+      color: #090b0e;
+    }
+    .sub-tab.active-nba {
+      background: var(--purple);
+      color: #fff;
+    }
 
     .search-row {
       display: flex;
@@ -326,9 +481,9 @@
       position: fixed;
       left: 0;
       right: 0;
-      bottom: 0;
-      z-index: 30;
-      background: rgba(10, 14, 22, 0.97);
+      bottom: var(--bottom-nav-h);
+      z-index: 32;
+      background: rgba(10, 14, 22, 0.98);
       backdrop-filter: blur(12px);
       border-top: 1px solid var(--cyan);
       padding: 8px 12px;
@@ -427,94 +582,157 @@
     </div>
   </header>
 
-  <div class="wrap">
-    <div class="tabs-bar">
-      <button id="tabEv" class="tab active-ev" onclick="switchSport('ev')">💎 +EV (<span id="evCount">0</span>)</button>
-      <button id="tabNba" class="tab" onclick="switchSport('nba')">🔥 Props (<span id="nbaCount">0</span>)</button>
-      <button id="tabNbaGames" class="tab" onclick="switchSport('nbagames')">🏀 NBA (<span id="nbaGamesCount">0</span>)</button>
-      <button id="tabNcaa" class="tab" onclick="switchSport('ncaa')">🏀 NCAA (<span id="ncaaCount">0</span>)</button>
-      <button id="tabBets" class="tab" onclick="switchSport('bets')">🎟️ Bets (<span id="betsCount">0</span>)</button>
-      <button id="tabRecap" class="tab" onclick="switchSport('recap')">📊 Recap</button>
-    </div>
+  <div class="app-shell">
+    <!-- Desktop Left Sidebar Rail -->
+    <aside class="side-rail" aria-label="Primary Navigation">
+      <div class="rail-section-lbl">Workspaces</div>
+      <button id="railEv" class="rail-btn active-ev" onclick="switchHub('ev')">
+        <span>💎 +EV Edge Board</span>
+        <span class="rail-badge" id="evCount">0</span>
+      </button>
 
-    <div id="marketControls">
-      <div class="search-row">
-        <input id="searchInput" class="search-input" type="text" placeholder="Search player or team..." oninput="resetAndRender()" />
-        <select id="filterSelect" class="filter-select" onchange="resetAndRender()">
-          <option value="ALL">All Matchups</option>
-          <option value="edge">High Edge Only</option>
-          <option value="slip">In Slip Only</option>
-        </select>
+      <button id="railNba" class="rail-btn" onclick="switchHub('nba', 'props')">
+        <span>🏀 NBA Hub</span>
+        <span class="rail-badge" id="nbaTotalCount">0</span>
+      </button>
+      <div class="rail-sub-group">
+        <button id="railNbaProps" class="rail-sub-btn" onclick="switchHub('nba', 'props')">🔥 Player Props (<span id="nbaCount">0</span>)</button>
+        <button id="railNbaGames" class="rail-sub-btn" onclick="switchHub('nba', 'games')">📊 Game Lines (<span id="nbaGamesCount">0</span>)</button>
+        <button id="railNbaRecap" class="rail-sub-btn" onclick="switchHub('nba', 'recap')">📋 NBA Recap</button>
       </div>
 
-      <div id="evChips" class="chips-row">
-        <button class="f-chip active" onclick="setEvFilter('ALL', this)">ALL +EV EDGES</button>
-        <button class="f-chip" onclick="setEvFilter('MAX', this)">🔥 15%+ MAX EV</button>
-        <button class="f-chip" onclick="setEvFilter('PROPS', this)">NBA PROPS</button>
-        <button class="f-chip" onclick="setEvFilter('NBAGAMES', this)">NBA GAMES</button>
-        <button class="f-chip" onclick="setEvFilter('NCAA', this)">NCAA GAMES</button>
+      <button id="railNcaa" class="rail-btn" onclick="switchHub('ncaa', 'games')">
+        <span>🎓 NCAA Hub</span>
+        <span class="rail-badge" id="ncaaCount">0</span>
+      </button>
+      <div class="rail-sub-group">
+        <button id="railNcaaGames" class="rail-sub-btn" onclick="switchHub('ncaa', 'games')">🏀 NCAA Predictions</button>
+        <button id="railNcaaRecap" class="rail-sub-btn" onclick="switchHub('ncaa', 'recap')">📋 NCAA Recap</button>
       </div>
 
-      <div id="nbaChips" class="chips-row" style="display:none;">
-        <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PROPS</button>
-        <button class="f-chip" onclick="setSubFilter('WATCH', this)">★ WATCHLIST</button>
-        <button class="f-chip" onclick="setSubFilter('UNDERS', this)">⬇ UNDERS</button>
-        <button class="f-chip" onclick="setSubFilter('ALTS', this)">🪜 ALT LADDERS</button>
-        <button class="f-chip" onclick="setSubFilter('HOT', this)">🔥 8/10 STREAKS</button>
-        <button class="f-chip" onclick="setSubFilter('USG', this)">⚡ USAGE BUMPS</button>
-        <button class="f-chip" onclick="setSubFilter('PTS', this)">POINTS</button>
-        <button class="f-chip" onclick="setSubFilter('REB', this)">REBOUNDS</button>
-        <button class="f-chip" onclick="setSubFilter('AST', this)">ASSISTS</button>
-        <button class="f-chip" onclick="setSubFilter('PRA', this)">PRA</button>
-      </div>
+      <div class="rail-section-lbl">Tracking</div>
+      <button id="railBets" class="rail-btn" onclick="switchHub('bets')">
+        <span>🎟️ My Tracked Bets</span>
+        <span class="rail-badge" id="betsCount">0</span>
+      </button>
+    </aside>
 
-      <div id="nbaGamesChips" class="chips-row" style="display:none;">
-        <button class="f-chip active" onclick="setNbaGamesFilter('ALL', this)">ALL NBA GAMES</button>
-        <button class="f-chip" onclick="setNbaGamesFilter('B2B', this)">💤 B2B FATIGUE</button>
-        <button class="f-chip" onclick="setNbaGamesFilter('MOVES', this)">📉 LINE MOVES</button>
-        <button class="f-chip" onclick="setNbaGamesFilter('TOTALS', this)">🎯 BEST TOTALS</button>
-        <button class="f-chip" onclick="setNbaGamesFilter('SPREADS', this)">📊 BEST SPREADS</button>
-      </div>
-
-      <div id="ncaaChips" class="chips-row" style="display:none;">
-        <button class="f-chip active" onclick="setNcaaFilter('ALL', this)">ALL NCAA GAMES</button>
-        <button class="f-chip" onclick="setNcaaFilter('TOTALS', this)">🎯 BEST TOTALS</button>
-        <button class="f-chip" onclick="setNcaaFilter('SPREADS', this)">📊 BEST SPREADS</button>
-      </div>
-
-      <div id="recapChips" class="chips-row" style="display:none;">
-        <button class="f-chip active" onclick="setRecapFilter('ALL', this)">ALL GRADED</button>
-        <button class="f-chip" onclick="setRecapFilter('HIT', this)">✅ HITS</button>
-        <button class="f-chip" onclick="setRecapFilter('MISS', this)">❌ MISSES</button>
-        <button class="f-chip" onclick="setRecapFilter('PROPS', this)">🔥 PROPS</button>
-        <button class="f-chip" onclick="setRecapFilter('NBA', this)">🏀 NBA</button>
-        <button class="f-chip" onclick="setRecapFilter('NCAA', this)">🏀 NCAA</button>
-      </div>
-
-      <div class="parlay-banner" id="heroParlay" style="display:none;">
-        <div>
-          <div class="parlay-banner-text">🎯 AI Top 4-Leg +EV Parlay</div>
-          <div class="parlay-banner-sub" id="heroParlaySub">Calculating optimal edges...</div>
+    <!-- Main Workspace Stage -->
+    <div class="main-stage">
+      <div class="wrap">
+        <div class="hub-header">
+          <div class="hub-title" id="hubTitle">💎 +EV Edge Board</div>
         </div>
-        <button class="btn-quick-parlay" onclick="loadTopParlay()">+ Load 4 Legs</button>
+
+        <!-- Hub-Specific Sub-Tabs (Shown inside NBA Hub & NCAA Hub) -->
+        <div id="nbaSubTabs" class="sub-tabs" style="display:none;">
+          <button id="subNbaProps" class="sub-tab active-nba" onclick="switchHub('nba', 'props')">🔥 Player Props</button>
+          <button id="subNbaGames" class="sub-tab" onclick="switchHub('nba', 'games')">🏀 Game Lines</button>
+          <button id="subNbaRecap" class="sub-tab" onclick="switchHub('nba', 'recap')">📊 NBA Recap</button>
+        </div>
+
+        <div id="ncaaSubTabs" class="sub-tabs" style="display:none;">
+          <button id="subNcaaGames" class="sub-tab active-ncaa" onclick="switchHub('ncaa', 'games')">🏀 NCAA Predictions</button>
+          <button id="subNcaaRecap" class="sub-tab" onclick="switchHub('ncaa', 'recap')">📊 NCAA Recap</button>
+        </div>
+
+        <div id="marketControls">
+          <div class="search-row">
+            <input id="searchInput" class="search-input" type="text" placeholder="Search player or team..." oninput="resetAndRender()" />
+            <select id="filterSelect" class="filter-select" onchange="resetAndRender()">
+              <option value="ALL">All Matchups</option>
+              <option value="edge">High Edge Only</option>
+              <option value="slip">In Slip Only</option>
+            </select>
+          </div>
+
+          <div id="evChips" class="chips-row">
+            <button class="f-chip active" onclick="setEvFilter('ALL', this)">ALL +EV EDGES</button>
+            <button class="f-chip" onclick="setEvFilter('MAX', this)">🔥 15%+ MAX EV</button>
+            <button class="f-chip" onclick="setEvFilter('PROPS', this)">NBA PROPS</button>
+            <button class="f-chip" onclick="setEvFilter('NBAGAMES', this)">NBA GAMES</button>
+            <button class="f-chip" onclick="setEvFilter('NCAA', this)">NCAA GAMES</button>
+          </div>
+
+          <div id="nbaChips" class="chips-row" style="display:none;">
+            <button class="f-chip active" onclick="setSubFilter('ALL', this)">ALL PROPS</button>
+            <button class="f-chip" onclick="setSubFilter('WATCH', this)">★ WATCHLIST</button>
+            <button class="f-chip" onclick="setSubFilter('UNDERS', this)">⬇ UNDERS</button>
+            <button class="f-chip" onclick="setSubFilter('ALTS', this)">🪜 ALT LADDERS</button>
+            <button class="f-chip" onclick="setSubFilter('HOT', this)">🔥 8/10 STREAKS</button>
+            <button class="f-chip" onclick="setSubFilter('USG', this)">⚡ USAGE BUMPS</button>
+            <button class="f-chip" onclick="setSubFilter('PTS', this)">POINTS</button>
+            <button class="f-chip" onclick="setSubFilter('REB', this)">REBOUNDS</button>
+            <button class="f-chip" onclick="setSubFilter('AST', this)">ASSISTS</button>
+            <button class="f-chip" onclick="setSubFilter('PRA', this)">PRA</button>
+          </div>
+
+          <div id="nbaGamesChips" class="chips-row" style="display:none;">
+            <button class="f-chip active" onclick="setNbaGamesFilter('ALL', this)">ALL NBA GAMES</button>
+            <button class="f-chip" onclick="setNbaGamesFilter('B2B', this)">💤 B2B FATIGUE</button>
+            <button class="f-chip" onclick="setNbaGamesFilter('MOVES', this)">📉 LINE MOVES</button>
+            <button class="f-chip" onclick="setNbaGamesFilter('TOTALS', this)">🎯 BEST TOTALS</button>
+            <button class="f-chip" onclick="setNbaGamesFilter('SPREADS', this)">📊 BEST SPREADS</button>
+          </div>
+
+          <div id="ncaaChips" class="chips-row" style="display:none;">
+            <button class="f-chip active" onclick="setNcaaFilter('ALL', this)">ALL NCAA PREDICTIONS</button>
+            <button class="f-chip" onclick="setNcaaFilter('SPREADS', this)">📊 BEST ATS SPREADS</button>
+            <button class="f-chip" onclick="setNcaaFilter('TOTALS', this)">🎯 BEST OVER/UNDERS</button>
+          </div>
+
+          <div id="recapChips" class="chips-row" style="display:none;">
+            <button class="f-chip active" onclick="setRecapOutcomeFilter('ALL', this)">ALL GRADED</button>
+            <button class="f-chip" onclick="setRecapOutcomeFilter('HIT', this)">✅ HITS ONLY</button>
+            <button class="f-chip" onclick="setRecapOutcomeFilter('MISS', this)">❌ MISSES ONLY</button>
+          </div>
+
+          <div class="parlay-banner" id="heroParlay" style="display:none;">
+            <div>
+              <div class="parlay-banner-text">🎯 AI Top 4-Leg +EV Parlay</div>
+              <div class="parlay-banner-sub" id="heroParlaySub">Calculating optimal edges...</div>
+            </div>
+            <button class="btn-quick-parlay" onclick="loadTopParlay()">+ Load 4 Legs</button>
+          </div>
+        </div>
+
+        <div id="betsControls" style="display:none;">
+          <div class="bets-summary">
+            <div class="b-stat"><div class="b-stat-lbl">Active Risk</div><div class="b-stat-val" id="statActiveRisk" style="color:var(--cyan);">$0</div></div>
+            <div class="b-stat"><div class="b-stat-lbl">Net P/L</div><div class="b-stat-val" id="statNetPL">$0</div></div>
+            <div class="b-stat"><div class="b-stat-lbl">Record</div><div class="b-stat-val" id="statRecord">0-0</div></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:0.7rem; color:var(--muted);" id="livePollStatus">Live ESPN auto-tracker active (45s)</span>
+            <button class="btn-sm" style="padding:4px 9px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="refreshTrackedBets()">⚡ Update Live Scores</button>
+          </div>
+        </div>
+
+        <main class="list" id="cardsList"></main>
+        <button class="load-more-btn" id="loadMoreBtn" style="display:none;" onclick="showMore()">Show More Results</button>
       </div>
     </div>
-
-    <div id="betsControls" style="display:none;">
-      <div class="bets-summary">
-        <div class="b-stat"><div class="b-stat-lbl">Active Risk</div><div class="b-stat-val" id="statActiveRisk" style="color:var(--cyan);">$0</div></div>
-        <div class="b-stat"><div class="b-stat-lbl">Net P/L</div><div class="b-stat-val" id="statNetPL">$0</div></div>
-        <div class="b-stat"><div class="b-stat-lbl">Record</div><div class="b-stat-val" id="statRecord">0-0</div></div>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:0.7rem; color:var(--muted);" id="livePollStatus">Live ESPN auto-tracker active (45s)</span>
-        <button class="btn-sm" style="padding:4px 9px; font-size:0.7rem; border-color:var(--cyan); color:var(--cyan);" onclick="refreshTrackedBets()">⚡ Update Live Scores</button>
-      </div>
-    </div>
-
-    <main class="list" id="cardsList"></main>
-    <button class="load-more-btn" id="loadMoreBtn" style="display:none;" onclick="showMore()">Show More Results</button>
   </div>
+
+  <!-- Mobile Fixed Bottom Navigation Bar -->
+  <nav class="bottom-nav" aria-label="Mobile Navigation">
+    <button id="bNavEv" class="b-nav-btn active-ev" onclick="switchHub('ev')">
+      <span class="nav-ico">💎</span>
+      <span>+EV (<span id="bEvCount">0</span>)</span>
+    </button>
+    <button id="bNavNba" class="b-nav-btn" onclick="switchHub('nba', 'props')">
+      <span class="nav-ico">🏀</span>
+      <span>NBA (<span id="bNbaCount">0</span>)</span>
+    </button>
+    <button id="bNavNcaa" class="b-nav-btn" onclick="switchHub('ncaa', 'games')">
+      <span class="nav-ico">🎓</span>
+      <span>NCAA (<span id="bNcaaCount">0</span>)</span>
+    </button>
+    <button id="bNavBets" class="b-nav-btn" onclick="switchHub('bets')">
+      <span class="nav-ico">🎟️</span>
+      <span>Bets (<span id="bBetsCount">0</span>)</span>
+    </button>
+  </nav>
 
   <div class="slip-bar" id="slipBar">
     <div class="slip-top">
