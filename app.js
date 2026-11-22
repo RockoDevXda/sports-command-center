@@ -623,12 +623,21 @@ async function gradeSlateRecap() {
   }
 
   const graded = [];
+  const seenIds = new Set();
+
   const gradeGamePick = (g, sportKey, sportBadge, betKind, pickTitle, lineVal, sideOrPick, oddsAm, probPct) => {
+    const uid = `${sportKey}-${g.id}-${betKind}`;
+    if (seenIds.has(uid)) return;
+    const { evPct } = calcEvAndQuarterKelly(probPct || 50, americanToDecimal(oddsAm || -110));
+    if (evPct < 3.0) return;
+
     const pool = sportKey === "NBA" ? nbaEvents : ncaaEvents;
     const awayLbl = g.away_abbr || g.away_short || "";
     const homeLbl = g.home_abbr || g.home_short || "";
     const ev = findMatchingEvent(pool, String(g.id || ""), awayLbl, homeLbl);
     if (!ev || ev.status?.type?.state !== "post") return;
+
+    seenIds.add(uid);
     const comp = ev.competitions?.[0];
     const awayC = comp?.competitors?.find(c => c.homeAway === "away");
     const homeC = comp?.competitors?.find(c => c.homeAway === "home");
@@ -653,7 +662,7 @@ async function gradeSlateRecap() {
     const dec = americanToDecimal(oddsAm || -110);
     const unitDelta = hit ? +(dec - 1).toFixed(2) : -1;
     graded.push({
-      id: `${sportKey}-${g.id}-${betKind}-${pickTitle}`,
+      id: uid,
       sport: sportKey,
       badge: sportBadge,
       title: pickTitle,
@@ -678,9 +687,19 @@ async function gradeSlateRecap() {
   }
 
   for (const p of (Array.isArray(nbaPlayers) ? nbaPlayers : [])) {
-    if (!p || !p.player) continue;
+    if (!p || !p.player || !p.best_prop) continue;
+    const m = p.best_prop;
+    const bestOdds = m.best_odds !== undefined && m.best_odds !== null ? m.best_odds : -110;
+    const { evPct } = calcEvAndQuarterKelly(m.prob || 50, americanToDecimal(bestOdds));
+    if (evPct < 3.0) continue;
+
+    const uid = `PROP-${p.game_id}-${p.id}`;
+    if (seenIds.has(uid)) continue;
+
     const ev = findMatchingEvent(nbaEvents, String(p.game_id || ""), p.opponent, p.team);
     if (!ev || ev.status?.type?.state !== "post") continue;
+
+    seenIds.add(uid);
     const gid = String(ev.id);
     if (!nbaBoxCache[gid]) {
       try {
@@ -688,27 +707,26 @@ async function gradeSlateRecap() {
         if (r.ok) nbaBoxCache[gid] = await r.json();
       } catch (e) {}
     }
-    for (const m of (Array.isArray(p.all_props) ? p.all_props : [])) {
-      if (!m || !m.market) continue;
-      const actual = extractNbaPlayerStat(nbaBoxCache[gid], String(p.id || ""), p.player, m.stat || "PTS");
-      const tgt = parseFloat(m.line) || 0;
-      const isU = m.side === "U";
-      const hit = isU ? actual < tgt : actual > tgt;
-      const dec = americanToDecimal(m.best_odds || -110);
-      graded.push({
-        id: `PROP-${p.id}-${m.stat}-${m.line}`,
-        sport: "PROPS",
-        badge: "🔥 NBA PROP",
-        title: `${p.player} ${m.market}`,
-        finalText: `Actual: ${actual} ${m.stat || "PTS"} vs Line ${tgt} (Final)`,
-        oddsAm: m.best_odds || -110,
-        probPct: m.prob || 55,
-        hit,
-        unitDelta: hit ? +(dec - 1).toFixed(2) : -1
-      });
-    }
+
+    const actual = extractNbaPlayerStat(nbaBoxCache[gid], String(p.id || ""), p.player, m.stat || "PTS");
+    const tgt = parseFloat(m.line) || 0;
+    const isU = m.side === "U";
+    const hit = isU ? actual < tgt : actual > tgt;
+    const dec = americanToDecimal(bestOdds);
+    graded.push({
+      id: uid,
+      sport: "PROPS",
+      badge: "🔥 NBA PROP",
+      title: `${p.player} ${m.market}`,
+      finalText: `Actual: ${actual} ${m.stat || "PTS"} vs Line ${tgt} (Final)`,
+      oddsAm: bestOdds,
+      probPct: m.prob || 55,
+      hit,
+      unitDelta: hit ? +(dec - 1).toFixed(2) : -1
+    });
   }
 
+  graded.sort((a, b) => (b.hit === a.hit ? b.probPct - a.probPct : (b.hit ? 1 : -1)));
   recapItems = graded;
 }
 
@@ -1296,7 +1314,16 @@ async function loadAllData(force = false) {
     }
     if (nbaRes.status === "fulfilled" && nbaRes.value.ok) {
       const d = await nbaRes.value.json();
-      if (Array.isArray(d)) nbaPlayers = d.filter(x => x && x.player);
+      if (Array.isArray(d)) {
+        const seenP = new Set();
+        nbaPlayers = d.filter(x => {
+          if (!x || !x.player) return false;
+          const k = `${x.game_id}-${x.id || x.player}`;
+          if (seenP.has(k)) return false;
+          seenP.add(k);
+          return true;
+        });
+      }
     }
     if (nbaGamesRes.status === "fulfilled" && nbaGamesRes.value.ok) {
       const d = await nbaGamesRes.value.json();
