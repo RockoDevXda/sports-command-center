@@ -534,9 +534,7 @@ function handleManualRefresh() {
   if (activeHub === "bets") refreshTrackedBets();
   else if (isRecap) gradeSlateRecap().then(render);
   else loadAllData(true);
-}
-
-function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
+function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); buildTopParlay(); render();
 function setSubFilter(val, btn) { subFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNbaGamesFilter(val, btn) { nbaGamesFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaGamesChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNcaaFilter(val, btn) { ncaaFilter = val; visibleLimit = 25; document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
@@ -945,18 +943,55 @@ function renderScopedRecap(scopeSport) {
 }
 
 function buildTopParlay() {
-  const legs = [], usedGames = new Set();
-  for (const item of evBoard) {
-    if (legs.length >= 4) break;
-    if (!usedGames.has(item.gameId)) {
-      legs.push({ key: item.key, label: item.title, prob: item.prob, meta: pickRegistry[item.key]?.meta || {} });
-      usedGames.add(item.gameId);
-    }
+  const legs = [];
+  const usedGames = new Set();
+  const usedPlayers = new Set();
+
+  let pool = evBoard;
+  if (evFilter === "MAX") pool = evBoard.filter(x => x.evPct >= 15.0);
+  else if (evFilter === "PROPS") pool = evBoard.filter(x => x.category === "PROPS");
+  else if (evFilter === "NBAGAMES") pool = evBoard.filter(x => x.category === "NBAGAMES");
+  else if (evFilter === "NCAA") pool = evBoard.filter(x => x.category === "NCAA");
+
+  const tryAdd = (item) => {
+    if (!item || legs.length >= 4) return false;
+    const meta = pickRegistry[item.key]?.meta || {};
+    const gid = String(item.gameId || meta.gameId || item.key);
+    const pName = (meta.playerName || "").toLowerCase().trim();
+    if (usedGames.has(gid)) return false;
+    if (pName && usedPlayers.has(pName)) return false;
+
+    legs.push({ key: item.key, label: item.title, prob: item.prob, meta });
+    usedGames.add(gid);
+    if (pName) usedPlayers.add(pName);
+    return true;
+  };
+
+  // When viewing ALL +EV EDGES, balance across NCAA, NBA Games, and NBA Props
+  if (evFilter === "ALL") {
+    const topNcaa = pool.filter(x => x.category === "NCAA");
+    const topNbaGames = pool.filter(x => x.category === "NBAGAMES");
+    const topProps = pool.filter(x => x.category === "PROPS");
+
+    topNcaa.slice(0, 2).forEach(tryAdd);
+    topNbaGames.slice(0, 1).forEach(tryAdd);
+    topProps.slice(0, 2).forEach(tryAdd);
   }
+
+  // Fill remaining slots up to 4 from highest +EV in active pool
+  for (const item of pool) {
+    if (legs.length >= 4) break;
+    tryAdd(item);
+  }
+
   topParlayLegs = legs;
   const banner = document.getElementById("heroParlay");
   if (!banner) return;
-  if (legs.length < 2 || activeHub !== "ev") { banner.style.display = "none"; return; }
+  if (legs.length < 2 || activeHub !== "ev") {
+    banner.style.display = "none";
+    return;
+  }
+
   let c = 1.0;
   legs.forEach(l => { c *= (l.prob / 100); });
   const pct = +(c * 100).toFixed(1);
