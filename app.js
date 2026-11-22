@@ -19,7 +19,11 @@ const SPORTSBOOKS = {
   betr: { name: "Betr Picks", mode: "pickem", web: "https://betr.app/", scheme: "betr://" }
 };
 
-let activeSport = "ev", evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", recapFilter = "PROPS", visibleLimit = 25;
+let activeHub = "ev"; // "ev" | "nba" | "ncaa" | "bets"
+let nbaSubView = "props"; // "props" | "games" | "recap"
+let ncaaSubView = "games"; // "games" | "recap"
+let evFilter = "ALL", subFilter = "ALL", nbaGamesFilter = "ALL", ncaaFilter = "ALL", recapOutcomeFilter = "ALL", visibleLimit = 25;
+
 let ncaaGames = [], nbaGames = [], nbaPlayers = [], evBoard = [], recapItems = [], topParlayLegs = [], slip = [], pickRegistry = {};
 let activePropByPlayer = {};
 let openHedgeMap = {};
@@ -32,7 +36,7 @@ let livePollTimer = null, deferredPrompt = null;
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
   navigator.serviceWorker.addEventListener("message", (e) => {
-    if (e.data?.type === "OPEN_BETS_TAB") switchSport("bets");
+    if (e.data?.type === "OPEN_BETS_TAB") switchHub("bets");
   });
 }
 window.addEventListener("beforeinstallprompt", (e) => {
@@ -91,7 +95,7 @@ function saveBankrollAndCalc() {
   const br = Math.max(1, parseFloat(document.getElementById("bankrollInput").value) || 500);
   try { localStorage.setItem(BANKROLL_KEY, String(br)); } catch (e) {}
   updateSlipUI(false);
-  if (activeSport === "ev") render();
+  if (activeHub === "ev") render();
 }
 
 function savePreferredBook() {
@@ -144,7 +148,7 @@ async function togglePinNotification(betId) {
     bet.pinned = false;
     persistBets();
     await closePinnedNotification(bet.id);
-    if (activeSport !== "bets") stopLivePoller();
+    if (activeHub !== "bets") stopLivePoller();
     renderBetsTab();
     return;
   }
@@ -340,29 +344,109 @@ function openSportsbookWithSlip() {
   }, 180);
 }
 
-function switchSport(sport) {
-  activeSport = sport;
+/* Hub & Sub-View Navigation */
+function switchHub(hub) {
+  activeHub = hub;
   visibleLimit = 25;
-  document.getElementById("tabEv").className = sport === "ev" ? "tab active-ev" : "tab";
-  document.getElementById("tabNba").className = sport === "nba" ? "tab active-nba" : "tab";
-  document.getElementById("tabNbaGames").className = sport === "nbagames" ? "tab active-nbagames" : "tab";
-  document.getElementById("tabNcaa").className = sport === "ncaa" ? "tab active-ncaa" : "tab";
-  document.getElementById("tabBets").className = sport === "bets" ? "tab active-bets" : "tab";
-  const tabRecap = document.getElementById("tabRecap");
-  if (tabRecap) tabRecap.className = sport === "recap" ? "tab active-recap" : "tab";
 
-  document.getElementById("marketControls").style.display = (sport === "bets" || sport === "recap") ? "none" : "block";
-  document.getElementById("betsControls").style.display = sport === "bets" ? "block" : "none";
-  document.getElementById("evChips").style.display = sport === "ev" ? "flex" : "none";
-  document.getElementById("nbaChips").style.display = sport === "nba" ? "flex" : "none";
-  document.getElementById("nbaGamesChips").style.display = sport === "nbagames" ? "flex" : "none";
-  document.getElementById("ncaaChips").style.display = sport === "ncaa" ? "flex" : "none";
-  const recapChips = document.getElementById("recapChips");
-  if (recapChips) recapChips.style.display = sport === "recap" ? "flex" : "none";
+  document.getElementById("navEv").className = hub === "ev" ? "rail-btn active-ev" : "rail-btn";
+  document.getElementById("navNba").className = hub === "nba" ? "rail-btn active-nba" : "rail-btn";
+  document.getElementById("navNcaa").className = hub === "ncaa" ? "rail-btn active-ncaa" : "rail-btn";
+  document.getElementById("navBets").className = hub === "bets" ? "rail-btn active-bets" : "rail-btn";
 
-  if (sport === "bets") { refreshTrackedBets(); startLivePoller(); }
-  else if (sport === "recap") { stopLivePoller(); gradeSlateRecap().then(renderRecapTab); }
-  else { stopLivePoller(); render(); }
+  document.getElementById("nbaSubNav").style.display = hub === "nba" ? "inline-flex" : "none";
+  document.getElementById("ncaaSubNav").style.display = hub === "ncaa" ? "inline-flex" : "none";
+
+  syncHubControlsAndHeader();
+
+  if (hub === "bets") {
+    refreshTrackedBets();
+    startLivePoller();
+  } else {
+    stopLivePoller();
+    const isRecap = (hub === "nba" && nbaSubView === "recap") || (hub === "ncaa" && ncaaSubView === "recap");
+    if (isRecap) gradeSlateRecap().then(render);
+    else render();
+  }
+}
+
+function setNbaSubView(sub) {
+  nbaSubView = sub;
+  visibleLimit = 25;
+  document.getElementById("subNbaProps").className = sub === "props" ? "sub-tab active-nba-sub" : "sub-tab";
+  document.getElementById("subNbaGames").className = sub === "games" ? "sub-tab active-nba-sub" : "sub-tab";
+  document.getElementById("subNbaRecap").className = sub === "recap" ? "sub-tab active-nba-sub" : "sub-tab";
+  syncHubControlsAndHeader();
+  if (sub === "recap") gradeSlateRecap().then(render);
+  else render();
+}
+
+function setNcaaSubView(sub) {
+  ncaaSubView = sub;
+  visibleLimit = 25;
+  document.getElementById("subNcaaGames").className = sub === "games" ? "sub-tab active-ncaa-sub" : "sub-tab";
+  document.getElementById("subNcaaRecap").className = sub === "recap" ? "sub-tab active-ncaa-sub" : "sub-tab";
+  syncHubControlsAndHeader();
+  if (sub === "recap") gradeSlateRecap().then(render);
+  else render();
+}
+
+function syncHubControlsAndHeader() {
+  const titleEl = document.getElementById("hubTitle");
+  const subEl = document.getElementById("hubSub");
+  const marketControls = document.getElementById("marketControls");
+  const betsControls = document.getElementById("betsControls");
+  const heroParlay = document.getElementById("heroParlay");
+
+  document.getElementById("evChips").style.display = "none";
+  document.getElementById("nbaChips").style.display = "none";
+  document.getElementById("nbaGamesChips").style.display = "none";
+  document.getElementById("ncaaChips").style.display = "none";
+  document.getElementById("recapChips").style.display = "none";
+
+  if (activeHub === "ev") {
+    titleEl.textContent = "💎 Cross-Sport +EV Edge Finder";
+    subEl.textContent = "Top mathematically positive expected value edges across NBA & NCAA";
+    marketControls.style.display = "block";
+    betsControls.style.display = "none";
+    document.getElementById("evChips").style.display = "flex";
+    if (topParlayLegs.length >= 2) heroParlay.style.display = "flex";
+  } else if (activeHub === "nba") {
+    marketControls.style.display = "block";
+    betsControls.style.display = "none";
+    heroParlay.style.display = "none";
+    if (nbaSubView === "props") {
+      titleEl.textContent = "🔥 NBA Player Props & Hit Form";
+      subEl.textContent = "Real sportsbook prop lines, No-Vig fair odds & last-10 ESPN game logs";
+      document.getElementById("nbaChips").style.display = "flex";
+    } else if (nbaSubView === "games") {
+      titleEl.textContent = "🏀 NBA Game Predictions (ATS & Totals)";
+      subEl.textContent = "Team pace, offensive/defensive efficiency & multi-book line edges";
+      document.getElementById("nbaGamesChips").style.display = "flex";
+    } else {
+      titleEl.textContent = "📊 NBA Graded Model Recap";
+      subEl.textContent = "Completed NBA props and game lines graded automatically via ESPN";
+      document.getElementById("recapChips").style.display = "flex";
+    }
+  } else if (activeHub === "ncaa") {
+    marketControls.style.display = "block";
+    betsControls.style.display = "none";
+    heroParlay.style.display = "none";
+    if (ncaaSubView === "games") {
+      titleEl.textContent = "🎓 NCAA Basketball Predictions";
+      subEl.textContent = "D1 matchup projections, spreads, totals & moneyline win probabilities";
+      document.getElementById("ncaaChips").style.display = "flex";
+    } else {
+      titleEl.textContent = "📊 NCAA Predictions Recap";
+      subEl.textContent = "Completed NCAA spreads & totals graded automatically via ESPN";
+      document.getElementById("recapChips").style.display = "flex";
+    }
+  } else if (activeHub === "bets") {
+    titleEl.textContent = "🎟️ Live Tracked Bets & Hedge Terminal";
+    subEl.textContent = "Real-time ESPN score tracking, progress bars & live cashout/hedge math";
+    marketControls.style.display = "none";
+    betsControls.style.display = "block";
+  }
 }
 
 function startLivePoller() {
@@ -370,7 +454,7 @@ function startLivePoller() {
   const hasPinned = trackedBets.some(b => b.pinned && b.status !== "won" && b.status !== "lost");
   const intervalMs = hasPinned ? 20000 : 45000;
   livePollTimer = setInterval(() => {
-    if (trackedBets.some(b => (b.status !== "won" && b.status !== "lost") && (activeSport === "bets" || b.pinned))) {
+    if (trackedBets.some(b => (b.status !== "won" && b.status !== "lost") && (activeHub === "bets" || b.pinned))) {
       refreshTrackedBets();
     }
   }, intervalMs);
@@ -380,17 +464,19 @@ function stopLivePoller() {
   if (livePollTimer) { clearInterval(livePollTimer); livePollTimer = null; }
 }
 function handleManualRefresh() {
-  if (activeSport === "bets") refreshTrackedBets();
-  else if (activeSport === "recap") gradeSlateRecap().then(renderRecapTab);
+  const isRecap = (activeHub === "nba" && nbaSubView === "recap") || (activeHub === "ncaa" && ncaaSubView === "recap");
+  if (activeHub === "bets") refreshTrackedBets();
+  else if (isRecap) gradeSlateRecap().then(render);
   else loadAllData(true);
 }
+
 function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setSubFilter(val, btn) { subFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNbaGamesFilter(val, btn) { nbaGamesFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaGamesChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNcaaFilter(val, btn) { ncaaFilter = val; visibleLimit = 25; document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
-function setRecapFilter(val, btn) { recapFilter = val; visibleLimit = 25; document.querySelectorAll("#recapChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); renderRecapTab(); }
+function setRecapOutcomeFilter(val, btn) { recapOutcomeFilter = val; visibleLimit = 25; document.querySelectorAll("#recapChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function resetAndRender() { visibleLimit = 25; render(); }
-function showMore() { visibleLimit += 25; if (activeSport === "recap") renderRecapTab(); else render(); }
+function showMore() { visibleLimit += 25; render(); }
 function registerPick(key, label, prob, meta) { pickRegistry[key] = { key, label, prob, meta }; }
 
 function toggleSlipByKey(key) {
@@ -479,7 +565,7 @@ function saveTrackedBet() {
   persistBets();
   slip = [];
   updateSlipUI(true);
-  switchSport("bets");
+  switchHub("bets");
 }
 
 function deleteTrackedBet(betId) {
@@ -577,7 +663,7 @@ function buildEvBoard() {
         const bookSnippet = g.best_book ? ` • Best: ${g.best_book} ${fmtAmerican(spOdds)}` : "";
         const nvSnippet = g.no_vig_odds ? ` • No-Vig: ${fmtAmerican(g.no_vig_odds)}` : "";
         items.push({
-          key: k, category: "NCAA", badge: "🏀 NCAA ATS",
+          key: k, category: "NCAA", badge: "🎓 NCAA ATS",
           title: g.spread_pick,
           subtitle: `${awayLbl} (${g.away_proj ?? "-"}) @ ${homeLbl} (${g.home_proj ?? "-"})${bookSnippet}${nvSnippet}`,
           tags: g.move_badges || [], prob: g.spread_cover_pct, evPct, qKellyPct, bestBook: g.best_book || "Consensus", bestOdds: spOdds, noVigOdds: g.no_vig_odds || null, dots: "", gameId: g.id
@@ -596,7 +682,7 @@ function buildEvBoard() {
         const bookSnippet = totBook ? ` • Best: ${totBook} ${fmtAmerican(totOdds)}` : "";
         const nvSnippet = nvOdds ? ` • No-Vig: ${fmtAmerican(nvOdds)}` : "";
         items.push({
-          key: k, category: "NCAA", badge: "🏀 NCAA TOTAL",
+          key: k, category: "NCAA", badge: "🎓 NCAA TOTAL",
           title: `${awayLbl}/${homeLbl} ${g.total_pick}`,
           subtitle: `Sim: ${g.total_proj ?? "-"} vs O/U ${g.over_under}${bookSnippet}${nvSnippet}`,
           tags: g.move_badges || [], prob: g.total_cover_pct, evPct, qKellyPct, bestBook: totBook || "Consensus", bestOdds: totOdds, noVigOdds: nvOdds, dots: "", gameId: g.id
@@ -682,8 +768,8 @@ async function gradeSlateRecap() {
 
   for (const g of (Array.isArray(ncaaGames) ? ncaaGames : [])) {
     if (!g || g.verified_d1 === false) continue;
-    if (g.has_line && g.spread_pick) gradeGamePick(g, "NCAA", "🏀 NCAA ATS", "ats", g.spread_pick, g.home_spread, g.spread_pick, g.best_odds, g.spread_cover_pct);
-    if (g.has_total && g.total_pick) gradeGamePick(g, "NCAA", "🏀 NCAA TOTAL", "total", `${g.away_short || g.away_team}/${g.home_short || g.home_team} ${g.total_pick}`, g.over_under, (g.total_pick || "").startsWith("U") ? "U" : "O", g.total_best_odds || g.best_odds, g.total_cover_pct);
+    if (g.has_line && g.spread_pick) gradeGamePick(g, "NCAA", "🎓 NCAA ATS", "ats", g.spread_pick, g.home_spread, g.spread_pick, g.best_odds, g.spread_cover_pct);
+    if (g.has_total && g.total_pick) gradeGamePick(g, "NCAA", "🎓 NCAA TOTAL", "total", `${g.away_short || g.away_team}/${g.home_short || g.home_team} ${g.total_pick}`, g.over_under, (g.total_pick || "").startsWith("U") ? "U" : "O", g.total_best_odds || g.best_odds, g.total_cover_pct);
   }
 
   for (const p of (Array.isArray(nbaPlayers) ? nbaPlayers : [])) {
@@ -730,18 +816,17 @@ async function gradeSlateRecap() {
   recapItems = graded;
 }
 
-function renderRecapTab() {
+function renderScopedRecap(scopeSport) {
   const listEl = document.getElementById("cardsList");
   const moreBtn = document.getElementById("loadMoreBtn");
   const q = document.getElementById("searchInput").value.toLowerCase().trim();
 
   const filtered = recapItems.filter(item => {
+    if (scopeSport === "NCAA" && item.sport !== "NCAA") return false;
+    if (scopeSport === "NBA" && item.sport !== "NBA" && item.sport !== "PROPS") return false;
     if (q && !item.title.toLowerCase().includes(q) && !item.finalText.toLowerCase().includes(q)) return false;
-    if (recapFilter === "HIT" && !item.hit) return false;
-    if (recapFilter === "MISS" && item.hit) return false;
-    if (recapFilter === "PROPS" && item.sport !== "PROPS") return false;
-    if (recapFilter === "NBA" && item.sport !== "NBA") return false;
-    if (recapFilter === "NCAA" && item.sport !== "NCAA") return false;
+    if (recapOutcomeFilter === "HIT" && !item.hit) return false;
+    if (recapOutcomeFilter === "MISS" && item.hit) return false;
     return true;
   });
 
@@ -749,23 +834,12 @@ function renderRecapTab() {
   const misses = filtered.length - hits;
   const pct = filtered.length ? ((hits / filtered.length) * 100).toFixed(1) : "0.0";
   const netUnits = filtered.reduce((acc, x) => acc + x.unitDelta, 0);
-
-  const scopeLabel = recapFilter === "PROPS"
-    ? "🔥 NBA Props"
-    : recapFilter === "NBA"
-      ? "🏀 NBA Games"
-      : recapFilter === "NCAA"
-        ? "🏀 NCAA Games"
-        : recapFilter === "HIT"
-          ? "✅ Hits Only"
-          : recapFilter === "MISS"
-            ? "❌ Misses Only"
-            : "All Markets";
+  const label = scopeSport === "NCAA" ? "🎓 NCAA Predictions" : "🏀 NBA Props & Games";
 
   const summaryHtml = `<div class="card recap-card ${netUnits >= 0 ? "hit" : "miss"}" style="grid-column:1/-1;">
     <div class="c-head">
       <div>
-        <div class="c-name">📊 ${escHtml(scopeLabel)} Recap • ${hits}W - ${misses}L (${pct}%)</div>
+        <div class="c-name">📊 ${escHtml(label)} Recap • ${hits}W - ${misses}L (${pct}%)</div>
         <div class="c-meta">Green = Hit • Red = Miss • Net Flat Units: <strong style="color:${netUnits >= 0 ? "var(--emerald)" : "var(--danger)"};">${netUnits >= 0 ? "+" : ""}${netUnits.toFixed(2)}u</strong></div>
       </div>
       <span class="edge-tag" style="background:${netUnits >= 0 ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)"}; color:${netUnits >= 0 ? "#10b981" : "#ef4444"};">${netUnits >= 0 ? "+" : ""}${netUnits.toFixed(2)}u</span>
@@ -773,7 +847,7 @@ function renderRecapTab() {
   </div>`;
 
   if (!filtered.length) {
-    listEl.innerHTML = summaryHtml + `<div class="card" style="grid-column:1/-1; text-align:center; padding:20px;"><div style="font-size:0.88rem; font-weight:700;">No Finalized ${escHtml(scopeLabel)} to Grade Yet</div><div style="font-size:0.74rem; color:var(--sub);">Switch filter chips (Props, NBA, NCAA) or check back once games finish on ESPN.</div></div>`;
+    listEl.innerHTML = summaryHtml + `<div class="card" style="grid-column:1/-1; text-align:center; padding:20px;"><div style="font-size:0.88rem; font-weight:700;">No Finalized ${escHtml(label)} to Grade Yet</div><div style="font-size:0.74rem; color:var(--sub);">Once games finish on ESPN, graded green (HIT) and red (MISS) cards appear here automatically.</div></div>`;
     moreBtn.style.display = "none";
     return;
   }
@@ -782,42 +856,21 @@ function renderRecapTab() {
   moreBtn.style.display = filtered.length > visibleLimit ? "block" : "none";
   moreBtn.textContent = `Show More (${filtered.length - visibleLimit} remaining)`;
 
-  const groupOrder = ["PROPS", "NBA", "NCAA"];
-  const groupTitles = {
-    PROPS: "🔥 NBA Player Props",
-    NBA: "🏀 NBA Game Lines",
-    NCAA: "🏀 NCAA Game Lines"
-  };
-
-  let cardsHtml = "";
-  let lastGroup = "";
-  for (const item of slice) {
-    const grp = groupOrder.includes(item.sport) ? item.sport : "NCAA";
-    if (grp !== lastGroup) {
-      lastGroup = grp;
-      const grpItems = filtered.filter(x => x.sport === grp);
-      const grpW = grpItems.filter(x => x.hit).length;
-      const grpL = grpItems.length - grpW;
-      cardsHtml += `<div style="grid-column:1/-1; font-size:0.78rem; font-weight:800; color:var(--cyan); padding:6px 2px 0; letter-spacing:0.03em;">${escHtml(groupTitles[grp])} (${grpW}W - ${grpL}L)</div>`;
-    }
-    cardsHtml += `
-      <article class="card recap-card ${item.hit ? "hit" : "miss"}">
-        <div class="c-head">
-          <div>
-            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px; flex-wrap:wrap;">
-              <span class="s-tag ${item.hit ? "" : "cyan"}" style="background:${item.hit ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}; color:${item.hit ? "#34d399" : "#f87171"};">${item.hit ? "✅ HIT" : "❌ MISS"}</span>
-              <span class="s-tag gold">${escHtml(item.badge)}</span>
-            </div>
-            <div class="c-name">${escHtml(item.title)}</div>
-            <div class="c-meta">${escHtml(item.finalText)} • ${fmtAmerican(item.oddsAm)} (${item.probPct}% Sim)</div>
+  listEl.innerHTML = summaryHtml + slice.map(item => `
+    <article class="card recap-card ${item.hit ? "hit" : "miss"}">
+      <div class="c-head">
+        <div>
+          <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px; flex-wrap:wrap;">
+            <span class="s-tag ${item.hit ? "" : "cyan"}" style="background:${item.hit ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}; color:${item.hit ? "#34d399" : "#f87171"};">${item.hit ? "✅ HIT" : "❌ MISS"}</span>
+            <span class="s-tag gold">${escHtml(item.badge)}</span>
           </div>
-          <span style="font-weight:800; font-size:0.85rem; color:${item.hit ? "#10b981" : "#ef4444"};">${item.unitDelta >= 0 ? "+" : ""}${item.unitDelta.toFixed(2)}u</span>
+          <div class="c-name">${escHtml(item.title)}</div>
+          <div class="c-meta">${escHtml(item.finalText)} • ${fmtAmerican(item.oddsAm)} (${item.probPct}% Sim)</div>
         </div>
-      </article>
-    `;
-  }
-
-  listEl.innerHTML = summaryHtml + cardsHtml;
+        <span style="font-weight:800; font-size:0.85rem; color:${item.hit ? "#10b981" : "#ef4444"};">${item.unitDelta >= 0 ? "+" : ""}${item.unitDelta.toFixed(2)}u</span>
+      </div>
+    </article>
+  `).join("");
 }
 
 function buildTopParlay() {
@@ -831,7 +884,7 @@ function buildTopParlay() {
   }
   topParlayLegs = legs;
   const banner = document.getElementById("heroParlay");
-  if (legs.length < 2) { banner.style.display = "none"; return; }
+  if (legs.length < 2 || activeHub !== "ev") { banner.style.display = "none"; return; }
   let c = 1.0;
   legs.forEach(l => { c *= (l.prob / 100); });
   const pct = +(c * 100).toFixed(1);
@@ -953,7 +1006,7 @@ async function refreshTrackedBets() {
         await pushPinnedNotification(bet, false);
         if (bet.status === "won" || bet.status === "lost") {
           bet.pinned = false;
-          if (activeSport !== "bets") stopLivePoller();
+          if (activeHub !== "bets") stopLivePoller();
         }
       }
     }
@@ -961,7 +1014,7 @@ async function refreshTrackedBets() {
     const hasPinned = trackedBets.some(b => b.pinned && b.status !== "won" && b.status !== "lost");
     if (statusEl) statusEl.textContent = `Live ESPN synced at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}${hasPinned ? " • 📌 Pinned live (20s)" : ""}`;
   } catch (e) { if (statusEl) statusEl.textContent = "Live check paused (offline)"; }
-  if (activeSport === "bets") renderBetsTab();
+  if (activeHub === "bets") renderBetsTab();
 }
 
 function extractNbaPlayerStat(sum, pid, pname, stat) {
@@ -1126,12 +1179,14 @@ function renderGameCards(gamesList, prefix, sportTag, activeSubFilter, q, filter
 }
 
 function render() {
-  if (activeSport === "bets") { renderBetsTab(); return; }
-  if (activeSport === "recap") { renderRecapTab(); return; }
+  if (activeHub === "bets") { renderBetsTab(); return; }
+  if (activeHub === "nba" && nbaSubView === "recap") { renderScopedRecap("NBA"); return; }
+  if (activeHub === "ncaa" && ncaaSubView === "recap") { renderScopedRecap("NCAA"); return; }
+
   const listEl = document.getElementById("cardsList"), moreBtn = document.getElementById("loadMoreBtn");
   const q = document.getElementById("searchInput").value.toLowerCase().trim(), filter = document.getElementById("filterSelect").value;
 
-  if (activeSport === "ev") {
+  if (activeHub === "ev") {
     const bankroll = Math.max(1, parseFloat(document.getElementById("bankrollInput")?.value) || 500);
     const filtered = evBoard.filter(item => {
       if (q && !item.title.toLowerCase().includes(q) && !item.subtitle.toLowerCase().includes(q)) return false;
@@ -1180,7 +1235,7 @@ function render() {
     return;
   }
 
-  if (activeSport === "nba") {
+  if (activeHub === "nba" && nbaSubView === "props") {
     const validPlayers = (Array.isArray(nbaPlayers) ? nbaPlayers : []).filter(p => p && p.player);
     const sorted = [...validPlayers].sort((a, b) => {
       if (subFilter === "ALTS") return ((b.alt_props?.[0]?.prob || 0) - (a.alt_props?.[0]?.prob || 0));
@@ -1256,9 +1311,12 @@ function render() {
         </div>
       </article>`;
     }).join("");
-  } else if (activeSport === "nbagames") {
+    return;
+  }
+
+  if (activeHub === "nba" && nbaSubView === "games") {
     renderGameCards(nbaGames, "nbagame", "nbagame", nbaGamesFilter, q, filter, listEl, moreBtn);
-  } else {
+  } else if (activeHub === "ncaa") {
     renderGameCards(ncaaGames, "ncaa", "ncaa", ncaaFilter, q, filter, listEl, moreBtn);
   }
 }
@@ -1296,7 +1354,7 @@ async function loadAllData(force = false) {
   document.getElementById("betsCount").textContent = trackedBets.length;
 
   const openBetsTab = new URLSearchParams(window.location.search).get("tab") === "bets";
-  if (openBetsTab) switchSport("bets");
+  if (openBetsTab) switchHub("bets");
   else if (trackedBets.some(b => b.pinned && b.status !== "won" && b.status !== "lost")) {
     refreshTrackedBets();
     startLivePoller();
@@ -1333,12 +1391,13 @@ async function loadAllData(force = false) {
     document.getElementById("ncaaCount").textContent = ncaaGames.length;
     document.getElementById("nbaCount").textContent = nbaPlayers.length;
     document.getElementById("nbaGamesCount").textContent = nbaGames.length;
+    document.getElementById("nbaHubCount").textContent = nbaPlayers.length + nbaGames.length;
     const ts = nbaGames[0]?.generated_at || ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
     document.getElementById("syncText").textContent = `Synced • ${formatEasternTimestamp(ts)}`;
 
     buildEvBoard();
     buildTopParlay();
-    if (!openBetsTab) render();
+    if (!openBetsTab) switchHub(activeHub);
   } catch (e) {
     console.warn("SimLab load warning:", e);
     document.getElementById("syncText").textContent = "Offline cache";
