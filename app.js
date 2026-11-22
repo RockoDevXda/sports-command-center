@@ -397,8 +397,10 @@ function importFromPhoneUrl() {
   }
 }
 
-function switchHub(hub) {
+function switchHub(hub, sub = null) {
   activeHub = hub;
+  if (hub === "nba" && sub) nbaSubView = sub;
+  if (hub === "ncaa" && sub) ncaaSubView = sub;
   visibleLimit = 25;
 
   const navEv = document.getElementById("navEv");
@@ -409,6 +411,18 @@ function switchHub(hub) {
   if (navNba) navNba.className = hub === "nba" ? "rail-btn active-nba" : "rail-btn";
   if (navNcaa) navNcaa.className = hub === "ncaa" ? "rail-btn active-ncaa" : "rail-btn";
   if (navBets) navBets.className = hub === "bets" ? "rail-btn active-bets" : "rail-btn";
+
+  const p = document.getElementById("subNbaProps");
+  const g = document.getElementById("subNbaGames");
+  const r = document.getElementById("subNbaRecap");
+  if (p) p.className = nbaSubView === "props" ? "sub-tab active-nba-sub" : "sub-tab";
+  if (g) g.className = nbaSubView === "games" ? "sub-tab active-nba-sub" : "sub-tab";
+  if (r) r.className = nbaSubView === "recap" ? "sub-tab active-nba-sub" : "sub-tab";
+
+  const ng = document.getElementById("subNcaaGames");
+  const nr = document.getElementById("subNcaaRecap");
+  if (ng) ng.className = ncaaSubView === "games" ? "sub-tab active-ncaa-sub" : "sub-tab";
+  if (nr) nr.className = ncaaSubView === "recap" ? "sub-tab active-ncaa-sub" : "sub-tab";
 
   const nbaSubNav = document.getElementById("nbaSubNav");
   const ncaaSubNav = document.getElementById("ncaaSubNav");
@@ -426,32 +440,6 @@ function switchHub(hub) {
     if (isRecap) gradeSlateRecap().then(render);
     else render();
   }
-}
-
-function setNbaSubView(sub) {
-  nbaSubView = sub;
-  visibleLimit = 25;
-  const p = document.getElementById("subNbaProps");
-  const g = document.getElementById("subNbaGames");
-  const r = document.getElementById("subNbaRecap");
-  if (p) p.className = sub === "props" ? "sub-tab active-nba-sub" : "sub-tab";
-  if (g) g.className = sub === "games" ? "sub-tab active-nba-sub" : "sub-tab";
-  if (r) r.className = sub === "recap" ? "sub-tab active-nba-sub" : "sub-tab";
-  syncHubControlsAndHeader();
-  if (sub === "recap") gradeSlateRecap().then(render);
-  else render();
-}
-
-function setNcaaSubView(sub) {
-  ncaaSubView = sub;
-  visibleLimit = 25;
-  const g = document.getElementById("subNcaaGames");
-  const r = document.getElementById("subNcaaRecap");
-  if (g) g.className = sub === "games" ? "sub-tab active-ncaa-sub" : "sub-tab";
-  if (r) r.className = sub === "recap" ? "sub-tab active-ncaa-sub" : "sub-tab";
-  syncHubControlsAndHeader();
-  if (sub === "recap") gradeSlateRecap().then(render);
-  else render();
 }
 
 function syncHubControlsAndHeader() {
@@ -534,7 +522,9 @@ function handleManualRefresh() {
   if (activeHub === "bets") refreshTrackedBets();
   else if (isRecap) gradeSlateRecap().then(render);
   else loadAllData(true);
-function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); buildTopParlay(); render();
+}
+
+function setEvFilter(val, btn) { evFilter = val; visibleLimit = 25; document.querySelectorAll("#evChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); buildTopParlay(); render(); }
 function setSubFilter(val, btn) { subFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNbaGamesFilter(val, btn) { nbaGamesFilter = val; visibleLimit = 25; document.querySelectorAll("#nbaGamesChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
 function setNcaaFilter(val, btn) { ncaaFilter = val; visibleLimit = 25; document.querySelectorAll("#ncaaChips .f-chip").forEach(c => c.classList.remove("active")); btn.classList.add("active"); render(); }
@@ -967,7 +957,6 @@ function buildTopParlay() {
     return true;
   };
 
-  // When viewing ALL +EV EDGES, balance across NCAA, NBA Games, and NBA Props
   if (evFilter === "ALL") {
     const topNcaa = pool.filter(x => x.category === "NCAA");
     const topNbaGames = pool.filter(x => x.category === "NBAGAMES");
@@ -978,7 +967,6 @@ function buildTopParlay() {
     topProps.slice(0, 2).forEach(tryAdd);
   }
 
-  // Fill remaining slots up to 4 from highest +EV in active pool
   for (const item of pool) {
     if (legs.length >= 4) break;
     tryAdd(item);
