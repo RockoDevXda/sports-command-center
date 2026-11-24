@@ -1,7 +1,7 @@
 {
   "id": "/sports-command-center/",
   "name": "EdgePulse Sports Command Center",
-  "short_name": "EdgePulse",
+  "short_name": "PickPulse",
   "description": "Automated NCAA D1 & NBA Player Props Monte Carlo Simulation Engine",
   "start_url": "/sports-command-center/index.html",
   "scope": "/sports-command-center/",
