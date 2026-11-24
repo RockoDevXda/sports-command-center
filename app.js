@@ -73,6 +73,7 @@ function toggleWatch(playerId, e) {
 function persistBets() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trackedBets)); } catch (e) {}
   setText("betsCount", trackedBets.length);
+  setText("bBetsCount", trackedBets.length);
 }
 function probToAmerican(pct) {
   const p = pct / 100;
@@ -329,22 +330,22 @@ function openSportsbookWithSlip() {
   copyTextSync(text);
 
   const btn = document.getElementById("openBookBtn");
-  btn.textContent = `✓ Copied! Launching ${book.name}...`;
-  setTimeout(() => { btn.textContent = "🚀 Copy & Open App"; }, 2400);
+  if (btn) {
+    btn.textContent = `✓ Copied! Launching ${book.name}...`;
+    setTimeout(() => { btn.textContent = "🚀 Copy & Open App"; }, 2400);
+  }
 
   const ua = navigator.userAgent || "";
   const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
 
-  setTimeout(() => {
-    if (isMobile && book.scheme) {
-      window.location.href = book.scheme;
-      setTimeout(() => {
-        if (!document.hidden) window.location.href = book.web;
-      }, 1500);
-    } else {
-      window.open(book.web, "_blank", "noopener");
-    }
-  }, 180);
+  if (isMobile && book.scheme) {
+    window.location.href = book.scheme;
+    setTimeout(() => {
+      if (!document.hidden && book.web) window.location.assign(book.web);
+    }, 1200);
+  } else if (book.web) {
+    window.open(book.web, "_blank", "noopener,noreferrer");
+  }
 }
 
 function exportSlipToPhoneUrl() {
@@ -398,45 +399,58 @@ function importFromPhoneUrl() {
 }
 
 function switchHub(hub, sub = null) {
-  activeHub = hub;
-  if (hub === "nba" && sub) nbaSubView = sub;
-  if (hub === "ncaa" && sub) ncaaSubView = sub;
+  if (hub === "nba" && !sub && activeHub === "nba") {
+    nbaSubView = nbaSubView === "props" ? "games" : (nbaSubView === "games" ? "recap" : "props");
+  } else {
+    activeHub = hub;
+    if (hub === "nba" && sub) nbaSubView = sub;
+    if (hub === "ncaa" && sub) ncaaSubView = sub;
+  }
   visibleLimit = 25;
 
-  const navEv = document.getElementById("navEv");
-  const navNba = document.getElementById("navNba");
-  const navNcaa = document.getElementById("navNcaa");
-  const navBets = document.getElementById("navBets");
-  if (navEv) navEv.className = hub === "ev" ? "rail-btn active-ev" : "rail-btn";
-  if (navNba) navNba.className = hub === "nba" ? "rail-btn active-nba" : "rail-btn";
-  if (navNcaa) navNcaa.className = hub === "ncaa" ? "rail-btn active-ncaa" : "rail-btn";
-  if (navBets) navBets.className = hub === "bets" ? "rail-btn active-bets" : "rail-btn";
+  const railEv = document.getElementById("railEv");
+  const railNba = document.getElementById("railNba");
+  const railNcaa = document.getElementById("railNcaa");
+  const railBets = document.getElementById("railBets");
+  if (railEv) railEv.className = activeHub === "ev" ? "rail-btn active-ev" : "rail-btn";
+  if (railNba) railNba.className = activeHub === "nba" ? "rail-btn active-nba" : "rail-btn";
+  if (railNcaa) railNcaa.className = activeHub === "ncaa" ? "rail-btn active-ncaa" : "rail-btn";
+  if (railBets) railBets.className = activeHub === "bets" ? "rail-btn active-bets" : "rail-btn";
+
+  const bNavEv = document.getElementById("bNavEv");
+  const bNavNba = document.getElementById("bNavNba");
+  const bNavNcaa = document.getElementById("bNavNcaa");
+  const bNavBets = document.getElementById("bNavBets");
+  if (bNavEv) bNavEv.className = activeHub === "ev" ? "b-nav-btn active-ev" : "b-nav-btn";
+  if (bNavNba) bNavNba.className = activeHub === "nba" ? "b-nav-btn active-nba" : "b-nav-btn";
+  if (bNavNcaa) bNavNcaa.className = activeHub === "ncaa" ? "b-nav-btn active-ncaa" : "b-nav-btn";
+  if (bNavBets) bNavBets.className = activeHub === "bets" ? "b-nav-btn active-bets" : "b-nav-btn";
 
   const p = document.getElementById("subNbaProps");
   const g = document.getElementById("subNbaGames");
   const r = document.getElementById("subNbaRecap");
-  if (p) p.className = nbaSubView === "props" ? "sub-tab active-nba-sub" : "sub-tab";
-  if (g) g.className = nbaSubView === "games" ? "sub-tab active-nba-sub" : "sub-tab";
-  if (r) r.className = nbaSubView === "recap" ? "sub-tab active-nba-sub" : "sub-tab";
+  if (p) p.className = nbaSubView === "props" ? "sub-tab active-nba" : "sub-tab";
+  if (g) g.className = nbaSubView === "games" ? "sub-tab active-nba" : "sub-tab";
+  if (r) r.className = nbaSubView === "recap" ? "sub-tab active-nba" : "sub-tab";
 
   const ng = document.getElementById("subNcaaGames");
   const nr = document.getElementById("subNcaaRecap");
-  if (ng) ng.className = ncaaSubView === "games" ? "sub-tab active-ncaa-sub" : "sub-tab";
-  if (nr) nr.className = ncaaSubView === "recap" ? "sub-tab active-ncaa-sub" : "sub-tab";
+  if (ng) ng.className = ncaaSubView === "games" ? "sub-tab active-ncaa" : "sub-tab";
+  if (nr) nr.className = ncaaSubView === "recap" ? "sub-tab active-ncaa" : "sub-tab";
 
-  const nbaSubNav = document.getElementById("nbaSubNav");
-  const ncaaSubNav = document.getElementById("ncaaSubNav");
-  if (nbaSubNav) nbaSubNav.style.display = hub === "nba" ? "inline-flex" : "none";
-  if (ncaaSubNav) ncaaSubNav.style.display = hub === "ncaa" ? "inline-flex" : "none";
+  const nbaSubTabs = document.getElementById("nbaSubTabs");
+  const ncaaSubTabs = document.getElementById("ncaaSubTabs");
+  if (nbaSubTabs) nbaSubTabs.style.display = activeHub === "nba" ? "flex" : "none";
+  if (ncaaSubTabs) ncaaSubTabs.style.display = activeHub === "ncaa" ? "flex" : "none";
 
   syncHubControlsAndHeader();
 
-  if (hub === "bets") {
+  if (activeHub === "bets") {
     refreshTrackedBets();
     startLivePoller();
   } else {
     stopLivePoller();
-    const isRecap = (hub === "nba" && nbaSubView === "recap") || (hub === "ncaa" && ncaaSubView === "recap");
+    const isRecap = (activeHub === "nba" && nbaSubView === "recap") || (activeHub === "ncaa" && ncaaSubView === "recap");
     if (isRecap) gradeSlateRecap().then(render);
     else render();
   }
@@ -751,6 +765,7 @@ function buildEvBoard() {
   items.sort((a, b) => b.evPct - a.evPct);
   evBoard = items;
   setText("evCount", evBoard.length);
+  setText("bEvCount", evBoard.length);
 }
 
 async function gradeSlateRecap() {
@@ -1459,6 +1474,7 @@ async function loadAllData(force = false) {
   const bust = force ? `?t=${Date.now()}` : `?t=${Math.floor(Date.now() / 60000)}`;
   setText("syncText", "Syncing...");
   setText("betsCount", trackedBets.length);
+  setText("bBetsCount", trackedBets.length);
 
   const openBetsTab = new URLSearchParams(window.location.search).get("tab") === "bets";
   if (openBetsTab) switchHub("bets");
@@ -1506,9 +1522,11 @@ async function loadAllData(force = false) {
     }
 
     setText("ncaaCount", ncaaGames.length);
+    setText("bNcaaCount", ncaaGames.length);
     setText("nbaCount", nbaPlayers.length);
     setText("nbaGamesCount", nbaGames.length);
     setText("nbaHubCount", nbaPlayers.length + nbaGames.length);
+    setText("bNbaCount", nbaPlayers.length + nbaGames.length);
 
     const ts = nbaGames[0]?.generated_at || ncaaGames[0]?.generated_at || nbaPlayers[0]?.generated_at || "Live";
     setText("syncText", anyLoaded ? `Synced • ${formatEasternTimestamp(ts)}` : "Offline cache");
