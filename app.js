@@ -209,7 +209,7 @@ async function pushPinnedNotification(bet, forceAlert = false) {
   const shouldAlert = isSettled || milestoneChanged || forceAlert;
   const opts = {
     body,
-    tag: `simlab-pin-${bet.id}`,
+    tag: `pickpulse-pin-${bet.id}`,
     icon: "./icon-512.jpeg",
     badge: "./icon-512.jpeg",
     requireInteraction: !isSettled,
@@ -233,7 +233,7 @@ async function closePinnedNotification(betId) {
   try {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready;
-      const list = await reg.getNotifications({ tag: `simlab-pin-${betId}` });
+      const list = await reg.getNotifications({ tag: `pickpulse-pin-${betId}` });
       list.forEach(n => n.close());
     }
   } catch (e) {}
@@ -257,7 +257,7 @@ function formatSlipForPlatform(mode) {
   });
 
   return [
-    `🎯 SimLab ${slip.length}-Leg Card (${pct}% Hit | Odds ${oddsVal} | $${stakeVal} → $${payoutVal}):`,
+    `🎯 PickPulse ${slip.length}-Leg Card (${pct}% Hit | Odds ${oddsVal} | $${stakeVal} → $${payoutVal}):`,
     ...lines,
     `📊 Terminal: https://rockodevxda.github.io/sports-command-center/`
   ].join("\n");
@@ -287,7 +287,7 @@ function copyTextSync(text) {
 async function triggerShareOrCopy(text, btnEl, defaultLabel) {
   if (navigator.share) {
     try {
-      await navigator.share({ title: "SimLab Bet Slip", text });
+      await navigator.share({ title: "PickPulse Bet Slip", text });
       return;
     } catch (e) {
       if (e.name === "AbortError") return;
@@ -311,7 +311,7 @@ function shareSavedBet(betId) {
   if (!bet) return;
   const statusTag = bet.status === "won" ? "🏆 WON" : (bet.status === "lost" ? "❌ LOST" : "⚡ LIVE");
   const lines = [
-    `🎯 SimLab ${bet.legs.length}-Leg Card [${statusTag}]`,
+    `🎯 PickPulse ${bet.legs.length}-Leg Card [${statusTag}]`,
     `💵 $${bet.stake} → $${bet.payout}`,
     ...bet.legs.map((l, i) => {
       const ic = l.status === "hit" ? "✅" : (l.status === "miss" ? "❌" : "⏳");
